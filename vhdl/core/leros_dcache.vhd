@@ -104,7 +104,7 @@ END COMPONENT;
 	signal words			: std_logic_vector(2 downto 0);
 	signal req, cache_write, cache_sel : std_logic;
 	signal validq : std_logic := '0';
-	signal rdindrq, wrindrq : std_logic;
+	signal rdindrq, wrindrq, storeq : std_logic;
 	signal stall : std_logic;
 
 begin
@@ -134,6 +134,7 @@ begin
 				validq <= '1' after 100 ps;
 				rdindrq <= rdindr after 100 ps;
 				wrindrq <= wrindr after 100 ps;
+				storeq <= store after 100 ps;
 			end if;
 		end if;
 	end process;
@@ -146,8 +147,10 @@ begin
 	dmem_wrdata <= cache_din when cache_sel = '1' else wrdata;
 	
 
-	reg_we <= "1111" when store = '1' and wrindr = '0' else "0000" after 100 ps;
-	cache_we <= "1111" when (store = '1' and wrindr = '1') or cache_write = '1' else "0000" after 100 ps;
+	reg_we <= "1111" when (store = '1' and wrindr = '0' and valid='1') or
+								 (valid = '0' and storeq = '1' and wrindrq = '0') 
+								 else "0000" after 100 ps;
+	cache_we <= "1111" when (store = '1' and wrindr = '1' and valid='1') or cache_write = '1' else "0000" after 100 ps;
 	tag_we <= "1111" when cache_write = '1' else "0000" after 100 ps;
 	
 	rddata <= rddata_cache when rdindrq = '1' else rddata_reg after 100 ps;

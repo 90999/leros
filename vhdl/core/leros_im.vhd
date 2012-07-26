@@ -206,7 +206,7 @@ vccv <= "1111111111111111";
 					--write the crap into the imem and tag ram
 					words <= std_logic_vector(unsigned(words)+1) after 100 ps;
 					--TODO: why the leading zero?
-					cache_wraddr <= '0' & cache_reqaddr(8 downto 4) & words;
+					cache_wraddr <= cache_reqaddr(9 downto 4) & words;
 					DIB <= cache_in.data after 100 ps;
 					cache_out.rden <= '1' after 100 ps;
 					WEB <= "1111" after 100 ps;

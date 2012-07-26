@@ -124,8 +124,10 @@ vccv <= "1111111111111111";
 	
 	cache_miss <= '1' when tag /= areg(25 downto 10) else '0' after 100 ps;
 	
-	--TODO: after a stall the icache is trying to clock the wrong address to output
+	--after a stall the icache is trying to clock the wrong address to output
 	--and the tag comparison becomes invalid after the first clock
+	--since there is no way to stop the bram's register from clocking
+	--we must implement a latch like input to the bram's
 	
 	process(clk)
 	begin

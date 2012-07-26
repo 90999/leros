@@ -88,12 +88,24 @@ COMPONENT tag_mem
   );
 END COMPONENT;
 
+COMPONENT reg_mem
+  PORT (
+    clka : IN STD_LOGIC;
+    wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    addra : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+    dina : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+    clkb : IN STD_LOGIC;
+    addrb : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+    doutb : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+  );
+END COMPONENT;
+
 	type CACHE_STATE_T is (IDLE,WAIT_FOR_DATA,TRANSFER_DATA,DELAY);
 	signal cache_state : CACHE_STATE_T := IDLE;
 
-	signal mem_wraddr, mem_rdaddr, cache_wraddr, dmem_wraddr : std_logic_vector(8 downto 0);
+	signal mem_wraddr, mem_rdaddr, cache_wraddr, dmem_wraddr, tag_wraddr : std_logic_vector(8 downto 0);
 	signal reg_we, cache_we, tag_we : std_logic_vector(3 downto 0);
-	signal rddata_cache, rddata_reg, dmem_wrdata, cache_din : std_logic_vector(31 downto 0);
+	signal rddata_cache, rddata_reg, dmem_wrdata, cache_din, wrdataq : std_logic_vector(31 downto 0);
 	signal gndv,vccv : std_logic_vector(31 downto 0);
 	signal rdaddrq,wraddrq : std_logic_vector(DM_BITS-1 downto 0);
 	signal latched_rdaddr,latched_wraddr : std_logic_vector(DM_BITS-1 downto 0);
@@ -112,8 +124,10 @@ begin
 	vccv <= X"FFFFFFFF";
 	gndv <= X"00000000";
 	
-	--TODO: we almost need to pipeline writes because the tag isn't known until
-	--after the cycle that could clobber data
+	--TODO: writes to cache are pipelined by an extra cycle
+	--this at least means a indr read cannot be performed
+	--on the write location without 2 wait states
+	--other hazards may exist wrt the writes cacheline
 
 
 	latched_rdaddr <= rdaddr when valid = '1' else rdaddrq after 100 ps;
@@ -135,37 +149,40 @@ begin
 				rdindrq <= rdindr after 100 ps;
 				wrindrq <= wrindr after 100 ps;
 				storeq <= store after 100 ps;
+				wrdataq <= wrdata after 100 ps;
 			end if;
 		end if;
 	end process;
 
 
-	dmem_wraddr <= cache_wraddr when cache_sel = '1' else latched_wraddr(8 downto 0) after 100 ps;	
+	dmem_wraddr <= cache_wraddr when cache_sel = '1' else wraddrq(8 downto 0) after 100 ps;
+	tag_wraddr <= cache_wraddr when cache_sel = '1' else latched_wraddr(8 downto 0) after 100 ps;	
+	
 	mem_wraddr <= latched_wraddr(8 downto 0) after 100 ps;
 	mem_rdaddr <= latched_rdaddr(8 downto 0) after 100 ps;
 	
-	dmem_wrdata <= cache_din when cache_sel = '1' else wrdata;
+	dmem_wrdata <= cache_din when cache_sel = '1' else wrdataq;
 	
 
 	reg_we <= "1111" when (store = '1' and wrindr = '0' and valid='1') or
 								 (valid = '0' and storeq = '1' and wrindrq = '0') 
 								 else "0000" after 100 ps;
-	cache_we <= "1111" when (store = '1' and wrindr = '1' and valid='1') or cache_write = '1' else "0000" after 100 ps;
+								 
+	cache_we <= "1111" when (storeq = '1' and wrindrq = '1' and valid='1') or cache_write = '1' else "0000" after 100 ps;
+	
+	
 	tag_we <= "1111" when cache_write = '1' else "0000" after 100 ps;
 	
 	rddata <= rddata_cache when rdindrq = '1' else rddata_reg after 100 ps;
-
-	DRAM_reg_inst : data_mem
+	
+	DRAM_reg_inst : reg_mem
 	PORT MAP (
     clka => clk,
     wea => reg_we(0 downto 0),
-    addra => mem_wraddr,
+    addra => mem_wraddr(7 downto 0),
     dina => wrdata,
---    douta => douta,
     clkb => clk,
-    web => gndv(0 downto 0),
-    addrb => mem_rdaddr,
-    dinb => gndv(31 downto 0),
+    addrb => mem_rdaddr(7 downto 0),
     doutb => rddata_reg
 	);
 
@@ -187,7 +204,7 @@ begin
 	PORT MAP (
     clka => clk,
     wea => tag_we(0 downto 0),
-    addra => dmem_wraddr,
+    addra => tag_wraddr,
     dina => tagi,
     douta => wrtago,
     clkb => clk,

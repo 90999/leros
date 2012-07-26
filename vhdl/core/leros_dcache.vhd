@@ -100,7 +100,18 @@ COMPONENT reg_mem
   );
 END COMPONENT;
 
-	type CACHE_STATE_T is (IDLE,WAIT_FOR_DATA,TRANSFER_DATA,DELAY);
+COMPONENT ditry_ram
+  PORT (
+    a : IN STD_LOGIC_VECTOR(5 DOWNTO 0);
+    d : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    dpra : IN STD_LOGIC_VECTOR(5 DOWNTO 0);
+    clk : IN STD_LOGIC;
+    we : IN STD_LOGIC;
+    qdpo : OUT STD_LOGIC_VECTOR(0 DOWNTO 0)
+  );
+END COMPONENT;
+
+	type CACHE_STATE_T is (IDLE,CHECK_DIRTY,WAIT_FOR_ACK,WAIT_FOR_DATA,TRANSFER_DATA,TRANSFER_RD_DATA,DELAY);
 	signal cache_state : CACHE_STATE_T := IDLE;
 
 	signal mem_wraddr, mem_rdaddr, cache_wraddr, dmem_wraddr, tag_wraddr : std_logic_vector(8 downto 0);
@@ -111,13 +122,18 @@ END COMPONENT;
 	signal latched_rdaddr,latched_wraddr : std_logic_vector(DM_BITS-1 downto 0);
 	signal wrtago,rdtago,tagi : std_logic_vector(15 downto 0);
 	signal rdmiss,wrmiss,dmissint : std_logic;
+	signal dirty_wraddr, dirty_rdaddr : std_logic_vector(5 downto 0);
+	signal dirty_din, dirty_dout : std_logic_vector(0 downto 0);
+	signal dirty_wren, dirty_clear : std_logic;
 	
 	signal cache_reqaddr	: std_logic_vector(IM_BITS-2 downto 0);
-	signal words			: std_logic_vector(2 downto 0);
+	signal cache_oldaddr	: std_logic_vector(IM_BITS-2 downto 0);
+	signal words			: std_logic_vector(3 downto 0);
 	signal req, cache_write, cache_sel : std_logic;
 	signal validq : std_logic := '0';
 	signal rdindrq, wrindrq, storeq : std_logic;
 	signal stall : std_logic;
+	signal cache_dout : std_logic_vector(31 downto 0);
 
 begin
 
@@ -192,7 +208,7 @@ begin
     wea => cache_we(0 downto 0),
     addra => dmem_wraddr,
     dina => dmem_wrdata,
---    douta => douta,
+    douta => cache_dout,
     clkb => clk,
     web => gndv(0 downto 0),
     addrb => mem_rdaddr,
@@ -214,9 +230,26 @@ begin
     doutb => rdtago
 	);
 	
+  DIRTYRAM_inst : ditry_ram
+  PORT MAP (
+    a => dirty_wraddr,
+    d => dirty_din,
+    dpra => dirty_rdaddr,
+    clk => clk,
+    we => dirty_wren,
+    qdpo => dirty_dout
+  );
+  
+  dirty_wren <= '1' when (cache_we(0) = '1' and cache_sel = '0') or dirty_clear = '1' else '0' after 100 ps;
+  dirty_wraddr <= cache_reqaddr(8 downto 3) when dirty_clear = '1' else wraddrq(8 downto 3) after 100 ps;
+  dirty_din <= "0" when dirty_clear = '1' else "1" after 100 ps;
+  dirty_rdaddr <= rdaddrq(8 downto 3) when rdmiss='1' else wraddrq(8 downto 3) after 100 ps;
+	
 	--TODO: in the event of a simultaneous read and write miss
 	--we will have a serious problem if the accesses have different
 	--tags that map to the same cache line
+	
+	--TODO: need a mechanism to clear the dirty flags
  
  	cache_out.req <= '0' when reset = '1' else req;
 	--Memory subsystem uses byte addresses
@@ -236,7 +269,9 @@ begin
 				cache_out.rden <= '0' after 100 ps;
 				cache_write <= '0' after 100 ps;
 				cache_sel <= '0' after 100 ps;
-				stall <= '0';
+				stall <= '0' after 100 ps;
+				dirty_clear <= '0' after 100 ps;
+				cache_out.wren <= '0' after 100 ps;
 			else
 				if cache_state = IDLE then
 					req <= '0' after 100 ps;
@@ -244,21 +279,53 @@ begin
 					cache_write <= '0' after 100 ps;
 					cache_sel <= '0' after 100 ps;
 					stall <= '0' after 100 ps;
+					cache_out.wren <= '0' after 100 ps;
 
 					--TODO: flush the line if its dirty
 					if rdmiss = '1' then
 						--8 dwords
 						cache_reqaddr <= rdaddrq(IM_BITS-2 downto 3) & "000" after 100 ps;
+						cache_oldaddr <= rdtago & rdaddrq(8 downto 3) & "000" after 100 ps;
 					elsif wrmiss = '1' then
 						cache_reqaddr <= wraddrq(IM_BITS-2 downto 3) & "000" after 100 ps;
+						cache_oldaddr <= wrtago & wraddrq(8 downto 3) & "000" after 100 ps;
 					end if;
 					
 					if dmissint = '1' then
-						req <= '1' after 100 ps;
+--						req <= '1' after 100 ps;
 						cache_out.len <= "000111" after 100 ps;
-						cache_state <= WAIT_FOR_DATA after 100 ps;
-						words <= "000" after 100 ps;
+						cache_state <= CHECK_DIRTY after 100 ps;
+						words <= "0000" after 100 ps;
 						stall <= '1' after 100 ps;
+					end if;
+				elsif cache_state = CHECK_DIRTY then
+					req <= '1' after 100 ps;
+					if dirty_dout(0) = '1' then
+						cache_out.req_write <= '1' after 100 ps;
+						cache_state <= WAIT_FOR_ACK after 100 ps;
+						cache_sel <= '1' after 100 ps;
+						cache_reqaddr <= cache_oldaddr after 100 ps;
+						--TODO: cache_reqaddr is not correct. needs to be formed from tago
+					else
+						cache_out.req_write <= '0' after 100 ps;
+						cache_state <= WAIT_FOR_DATA after 100 ps;
+					end if;
+				elsif cache_state = WAIT_FOR_ACK then
+					req <= '0' after 100 ps;
+					if cache_in.ack = '1' then
+						cache_state <= TRANSFER_RD_DATA after 100 ps;
+					end if;
+				elsif cache_state = TRANSFER_RD_DATA then
+					cache_out.wren <= '1' after 100 ps;
+					words <= std_logic_vector(unsigned(words)+1) after 100 ps;
+					cache_wraddr <= cache_reqaddr(8 downto 3) & std_logic_vector(unsigned(words(2 downto 0))+1) after 100 ps;
+					cache_out.data <= cache_dout after 100 ps;
+					if words = "1000" then
+						cache_out.wren <= '0' after 100 ps;
+						dirty_clear <= '1' after 100 ps;
+						--TODO: we can speeed things up a little by not doing the
+						--dirty check and stuff again
+						cache_state <= IDLE after 100 ps;
 					end if;
 				elsif cache_state = WAIT_FOR_DATA then
 					req <= '0' after 100 ps;
@@ -269,7 +336,7 @@ begin
 				elsif cache_state = TRANSFER_DATA then
 					--write the crap into the imem and tag ram
 					words <= std_logic_vector(unsigned(words)+1) after 100 ps;
-					cache_wraddr <= cache_reqaddr(8 downto 3) & words;
+					cache_wraddr <= cache_reqaddr(8 downto 3) & words(2 downto 0) after 100 ps;
 					cache_write <= '1' after 100 ps;
 					cache_sel <= '1' after 100 ps;
 					cache_din <= cache_in.data after 100 ps;

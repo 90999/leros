@@ -93,12 +93,16 @@ package leros_types is
 		addr : std_logic_vector(IM_BITS downto 0);
 		len : std_logic_vector(5 downto 0);
 		req : std_logic;
+		req_write : std_logic;
 		rden : std_logic;
+		wren : std_logic;
+		data : std_logic_vector(31 downto 0);
 	end record;
 	
 	type dm_cache_in_type is record
 		data : std_logic_vector(31 downto 0);
 		empty : std_logic;
+		ack : std_logic;
 	end record;
 
 	type fedec_in_type is record

@@ -51,81 +51,101 @@ begin
 process(instr)
 begin
 	-- some defaults
-	dec.op <= op_ld;
-	dec.al_ena <= '0';
-	dec.ah_ena <= '0';
-	dec.log_add <= '0';
-	dec.add_sub <= '0';
-	dec.shr <= '0';
-	dec.sel_imm <= '0';
-	dec.store <= '0';
-	dec.outp <= '0';
-	dec.inp <= '0';
+	dec.op <= op_ld after 100 ps;
+	dec.al_ena <= '0' after 100 ps;
+	dec.ah_ena <= '0' after 100 ps;
+	dec.ahl_ena <= '0' after 100 ps;
+	dec.ahh_ena <= '0' after 100 ps;
+	dec.log_add <= '0' after 100 ps;
+	dec.add_sub <= '0' after 100 ps;
+	dec.shr <= '0' after 100 ps;
+	dec.sel_imm <= '0' after 100 ps;
+	dec.store <= '0' after 100 ps;
+	dec.outp <= '0' after 100 ps;
+	dec.inp <= '0' after 100 ps;
 	-- used in decode, not in ex
-	dec.br_op <= '0';
-	dec.jal <= '0';
-	dec.loadh <= '0';
-	dec.indls<= '0';	
+	dec.br_op <= '0' after 100 ps;
+	dec.jal <= '0' after 100 ps;
+	dec.loadh <= '0' after 100 ps;
+	dec.loadhl <= '0' after 100 ps;
+	dec.loadhh <= '0' after 100 ps;
+	dec.indls<= '0' after 100 ps;	
 	
 	-- start decoding
-	dec.add_sub <= instr(2);
-	dec.sel_imm <= instr(0);
+	dec.add_sub <= instr(2) after 100 ps;
+	dec.sel_imm <= instr(0) after 100 ps;
 	-- bit 1 and 2 partially unused
 	case instr(7 downto 3) is
 		when "00000" =>		-- nop
 		when "00001" =>		-- add, sub
-			dec.al_ena <= '1';
-			dec.ah_ena <= '1';
-			dec.log_add <= '1';
+			dec.al_ena <= '1' after 100 ps;
+			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
+			dec.log_add <= '1' after 100 ps;
 		when "00010" =>		-- shr
-			dec.al_ena <= '1';
-			dec.ah_ena <= '1';
-			dec.shr <= '1';
+			dec.al_ena <= '1' after 100 ps;
+			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
+			dec.shr <= '1' after 100 ps;
 		when "00011" =>		-- reserved
 			null;
 		when "00100" =>		-- alu
-			dec.al_ena <= '1';
-			dec.ah_ena <= '1';
+			dec.al_ena <= '1' after 100 ps;
+			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
 		when "00101" =>		-- loadh
-			dec.loadh <= '1';
-			dec.ah_ena <= '1';
+			dec.loadh <= '1' after 100 ps;
+			dec.ah_ena <= '1' after 100 ps;
 		when "00110" =>		-- store
-			dec.store <= '1';
+			dec.store <= '1' after 100 ps;
 		when "00111" =>		-- I/O
 			if instr(2)='0' then
-				dec.outp <= '1';
+				dec.outp <= '1' after 100 ps;
 			else
-				dec.al_ena <= '1';
-				dec.ah_ena <= '1';
-				dec.inp <= '1';
+				dec.al_ena <= '1' after 100 ps;
+				dec.ah_ena <= '1' after 100 ps;
+				dec.ahl_ena <= '1' after 100 ps;
+				dec.ahh_ena <= '1' after 100 ps;
+				dec.inp <= '1' after 100 ps;
 			end if;
 		when "01000" =>		-- jal
-			dec.jal <= '1';
-			dec.store <= '1';
+			dec.jal <= '1' after 100 ps;
+			dec.store <= '1' after 100 ps;
 		when "01001" =>		-- branch
-			dec.br_op <= '1';
+			dec.br_op <= '1' after 100 ps;
 		when "01010" =>		-- loadaddr
 			null;
 		when "01100" =>		-- load indirect
-			dec.al_ena <= '1';
-			dec.ah_ena <= '1';
-			dec.indls <= '1';
+			dec.al_ena <= '1' after 100 ps;
+			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
+			dec.indls <= '1' after 100 ps;
 		when "01110" =>		-- store indirect
-			dec.indls <= '1';
-			dec.store <= '1';
+			dec.indls <= '1' after 100 ps;
+			dec.store <= '1' after 100 ps;
+		when "01111" =>		-- loadhl
+			dec.loadhl <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+		when "10000" =>		-- loadhh
+			dec.loadhh <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
 		when others =>
 			null;
 	end case;
 
 	case instr(2 downto 1) is
 		when "00" =>
-			dec.op <= op_ld;
+			dec.op <= op_ld after 100 ps;
 		when "01" =>
-			dec.op <= op_and;
+			dec.op <= op_and after 100 ps;
 		when "10" =>
-			dec.op <= op_or;
+			dec.op <= op_or after 100 ps;
 		when "11" =>
-			dec.op <= op_xor;
+			dec.op <= op_xor after 100 ps;
 		when others =>
 			null;
 	end case;

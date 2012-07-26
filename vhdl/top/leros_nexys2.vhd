@@ -52,17 +52,14 @@ port (
 	led     : out std_logic_vector(7 downto 0);
 --	btn		: in std_logic_vector(3 downto 0);
 --	rsrx	: in std_logic;
-	rstx	: out std_logic
+	rstx	: out std_logic;
+	ser_txd : out std_logic;
+	ser_rxd : in std_logic
 );
 end leros_nexys2;
 
 architecture rtl of leros_nexys2 is
-
-
---
---	Signals
---
-	signal clk_int			: std_logic;
+   signal clk_int       : std_logic;
 
 	signal int_res			: std_logic;
 	signal res_cnt			: unsigned(2 downto 0) := "000";	-- for the simulation
@@ -77,24 +74,8 @@ architecture rtl of leros_nexys2 is
 	
 begin
 
-	-- input clock is 50 MHz
-	-- let's go for 200 MHz ;-)
-	-- but for now 100 MHz is enough
-	-- limit is 9.354ns => 100 MHz should be ok
-	pll_inst : entity work.sp3epll generic map(
-		multiply_by => 2,
-		divide_by => 1
-	)
-	port map (
-		CLKIN_IN => clk,
-		RST_IN => '0',
-		CLKFX_OUT => clk_int,
-		CLKIN_IBUFG_OUT => open,
-		CLK0_OUT => open,
-		LOCKED_OUT => open
-	);
 
---	clk_int <= clk;
+	clk_int <= clk;
 --
 --	internal reset generation
 --	should include the PLL lock signal
@@ -104,10 +85,10 @@ process(clk_int)
 begin
 	if rising_edge(clk_int) then
 		if (res_cnt/="111") then
-			res_cnt <= res_cnt+1;
+			res_cnt <= res_cnt+1 after 100 ps;
 		end if;
 
-		int_res <= not res_cnt(0) or not res_cnt(1) or not res_cnt(2);
+		int_res <= not res_cnt(0) or not res_cnt(1) or not res_cnt(2) after 100 ps;
 	end if;
 end process;
 
@@ -115,7 +96,25 @@ end process;
 	cpu: entity work.leros
 		port map(clk_int, int_res, ioout, ioin);
 
-	ioin.rddata <= (others => '0');
+	ua: entity work.uart generic map (
+		clk_freq => 100000000,
+		baud_rate => 11520000,
+		txf_depth => 1,
+		rxf_depth => 1
+	)
+	port map(
+		clk => clk_int,
+		reset => int_res,
+
+		address => ioout.addr(0),
+		wr_data => ioout.wrdata(15 downto 0),
+		rd => ioout.rd,
+		wr => ioout.wr,
+		rd_data => ioin.rddata(15 downto 0),
+
+		txd	 => ser_txd,
+		rxd	 => ser_rxd
+	);
 	
 	rstx <= '0'; -- just a default to make ISE happy
 	
@@ -123,9 +122,9 @@ process(clk_int)
 begin
 	if rising_edge(clk_int) then
 		if ioout.wr='1' then
-			outp <= ioout.wrdata;
+			outp <= ioout.wrdata(15 downto 0) after 100 ps;
 		end if;
-		led <= outp(7 downto 0);
+		led <= outp(7 downto 0) after 100 ps;
 	end if;
 end process;
 

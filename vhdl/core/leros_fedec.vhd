@@ -61,6 +61,7 @@ begin
 	dout.pc <= std_logic_vector(pc_add);
 	
 	imin.rdaddr <= std_logic_vector(pc_next);
+	imin.pc <= std_logic_vector(pc);
 	
 	im: entity work.leros_im port map(
 		clk, reset, imin, imout
@@ -72,15 +73,15 @@ begin
 	
 -- DM address selection
 process(decode, din, imout)
-	variable addr : std_logic_vector(15 downto 0);
+	variable addr : std_logic_vector(31 downto 0);
 begin
 	addr := std_logic_vector(unsigned(din.dm_data) + unsigned(imout.data(7 downto 0)));
 	-- MUX for indirect load/store (from unregistered decode)
 	if decode.indls='1' then
-		dout.dm_addr <= addr(DM_BITS-1 downto 0);
+		dout.dm_addr <= addr(DM_BITS-1 downto 0) after 100 ps;
 	else
 		-- If DM > 256 zero extend the varidx
-		dout.dm_addr <= imout.data(DM_BITS-1 downto 0);
+		dout.dm_addr <= imout.data(DM_BITS-1 downto 0) after 100 ps;
 	end if;
 
 end process;
@@ -90,32 +91,32 @@ process(decode, din, do_branch, imout, pc, pc_add, pc_op, zf)
 begin
 	-- should be checked in ModelSim
 	if unsigned(din.accu)=0 then
-		zf <= '1';
+		zf <= '1' after 100 ps;
 	else
-		zf <= '0';
+		zf <= '0' after 100 ps;
 	end if;
-	do_branch <= '0'; -- is setting and reading a signal in on process ok style?
+	do_branch <= '0' after 100 ps; -- is setting and reading a signal in on process ok style?
 	
 	-- check branch condition
 	if decode.br_op='1' then
 		case imout.data(10 downto 8) is
 			when "000" =>		-- branch
-				do_branch <= '1';
+				do_branch <= '1' after 100 ps;
 			when "001" =>		-- brz
 				if zf='1' then
-					do_branch <= '1';
+					do_branch <= '1' after 100 ps;
 				end if;
 			when "010" =>		-- brnz
 				if zf='0' then
-					do_branch <= '1';
+					do_branch <= '1' after 100 ps;
 				end if;
 			when "011" =>		-- brp
 				if din.accu(15)='0' then
-					do_branch <= '1';
+					do_branch <= '1' after 100 ps;
 				end if;
 			when "100" =>		-- brn
 				if din.accu(15)='1' then
-					do_branch <= '1';
+					do_branch <= '1' after 100 ps;
 				end if;
 			when others =>
 				null;
@@ -126,35 +127,47 @@ begin
 	-- we will have a real branch delay slot?
 	-- branch
 	if do_branch='1' then
-		pc_op <= unsigned(resize(signed(imout.data(7 downto 0)), IM_BITS));
+		pc_op <= unsigned(resize(signed(imout.data(7 downto 0)), IM_BITS)) after 100 ps;
 	else
-		pc_op <= to_unsigned(1, IM_BITS);
+		pc_op <= to_unsigned(1, IM_BITS) after 100 ps;
 	end if;
-	pc_add <= pc + pc_op;
+	pc_add <= pc + pc_op after 100 ps;
 	-- jump and link
 	if decode.jal='1' then
-		pc_next <= unsigned(din.accu(IM_BITS-1 downto 0));
+		pc_next <= unsigned(din.accu(IM_BITS-1 downto 0)) after 100 ps;
 	else
-		pc_next <= pc_add;
+		pc_next <= pc_add after 100 ps;
 	end if;
 	
 end process;
+
+dout.valid <= imout.valid;
 	
 -- pc register
 process(clk, reset)
 begin
 	if reset='1' then
-		pc <= (others => '0');
+		pc <= (others => '0') after 100 ps;
 	elsif rising_edge(clk) then
-		pc <= pc_next;
-		dout.dec <= decode;
---		if decode.add_sub='1' then
-		-- sign extension depends on loadh?????
-		if decode.loadh='1' then
-			dout.imm(7 downto 0) <= (others => '0');
-			dout.imm(15 downto 8) <= imout.data(7 downto 0);
-		else
-			dout.imm <= std_logic_vector(resize(signed(imout.data(7 downto 0)), 16));
+		if imout.valid = '1' then --Stall pc
+			pc <= pc_next after 100 ps;
+			dout.dec <= decode after 100 ps;
+	--		if decode.add_sub='1' then
+			-- sign extension depends on loadh?????
+			if decode.loadh='1' then
+				dout.imm(7 downto 0) <= (others => '0') after 100 ps;
+				dout.imm(15 downto 8) <= imout.data(7 downto 0) after 100 ps;
+				dout.imm(31 downto 16) <= (others => '0') after 100 ps;
+			elsif	decode.loadhl='1' then
+				dout.imm(15 downto 0) <= (others => '0') after 100 ps;
+				dout.imm(23 downto 16) <= imout.data(7 downto 0) after 100 ps;
+				dout.imm(31 downto 24) <= (others => '0') after 100 ps;
+			elsif decode.loadhh='1' then
+				dout.imm(23 downto 0) <= (others => '0') after 100 ps;
+				dout.imm(31 downto 24) <= imout.data(7 downto 0) after 100 ps;
+			else
+				dout.imm <= std_logic_vector(resize(signed(imout.data(7 downto 0)), 32)) after 100 ps;
+			end if;
 		end if;
 --		else
 --			immr(7 downto 0) <= imout.data(7 downto 0);

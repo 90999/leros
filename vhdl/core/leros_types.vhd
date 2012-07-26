@@ -97,7 +97,6 @@ package leros_types is
 		dec : decode_type;
 		imm : std_logic_vector(31 downto 0);
 		dm_addr : std_logic_vector(DM_BITS-1 downto 0);
-		dm_indr : std_logic;
 		pc : std_logic_vector(IM_BITS-1 downto 0);
 		valid : std_logic;
 	end record;

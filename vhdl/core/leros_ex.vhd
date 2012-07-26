@@ -76,17 +76,18 @@ architecture rtl of leros_ex is
 	signal pc_dly : std_logic_vector(IM_BITS-1 downto 0);
 	
 	signal rdaddr_indr, wraddr_indr : std_logic;
-	signal wraddr_indr_dly : std_logic;
 
 begin
 
 	dout.accu <= std_logic_vector(accu) after 100 ps;
 	dout.dm_data <= rddata after 100 ps;
 	rdaddr <= din.dm_addr after 100 ps;
-	rdaddr_indr <= din.dm_indr after 100 ps;
+	
+	--TODO: pretty sure this is all wrong. dec is cycle delayed decode
+	rdaddr_indr <= din.dec.indls and not din.dec.store after 100 ps;
 	-- address for the write needs one cycle delay
 	wraddr <= wraddr_dly after 100 ps;
-	wraddr_indr <= wraddr_indr_dly after 100 ps;
+	wraddr_indr <= din.dec.indls and din.dec.store  after 100 ps;
 	
 --todo add high word	
 process(din, rddata)
@@ -108,18 +109,15 @@ begin
 		arith <= accu - opd after 100 ps;
 	end if;
 
-	case din.dec.op is
-		when op_ld =>
+	if din.dec.op = op_ld or din.dec.loadhl = '1' or din.dec.loadhh = '1' then
 			log <= opd after 100 ps;
-		when op_and =>
+	elsif din.dec.op = op_and then
 			log <= accu and opd after 100 ps;
-		when op_or =>
+	elsif din.dec.op = op_or then
 			log <= accu or opd after 100 ps;
-		when op_xor =>
+	else
 			log <= accu xor opd after 100 ps;
-		when others =>
-			null;
-	end case;
+	end if;
 	
 	if din.dec.log_add='0' then
 		if din.dec.shr='1' then
@@ -169,7 +167,6 @@ begin
 				accu(31 downto 24) <= a_mux(31 downto 24) after 100 ps;
 			end if;
 			wraddr_dly <= din.dm_addr after 100 ps;
-			wraddr_indr_dly <= din.dm_indr after 100 ps;
 			pc_dly <= din.pc after 100 ps;
 				-- a simple output port for the hello world example
 	--		if din.dec.outp='1' then

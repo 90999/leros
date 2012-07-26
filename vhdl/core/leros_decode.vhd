@@ -96,9 +96,17 @@ begin
 			dec.ah_ena <= '1' after 100 ps;
 			dec.ahl_ena <= '1' after 100 ps;
 			dec.ahh_ena <= '1' after 100 ps;
-		when "00101" =>		-- loadh
-			dec.loadh <= '1' after 100 ps;
-			dec.ah_ena <= '1' after 100 ps;
+		when "00101" =>		-- loadh*
+			if instr(2 downto 1) = "11" then
+				dec.loadhh <= '1' after 100 ps;
+				dec.ahh_ena <= '1' after 100 ps;
+			elsif instr(2 downto 1) = "10" then
+				dec.loadhl <= '1' after 100 ps;
+				dec.ahl_ena <= '1' after 100 ps;	
+			else
+				dec.loadh <= '1' after 100 ps;
+				dec.ah_ena <= '1' after 100 ps;
+			end if;
 		when "00110" =>		-- store
 			dec.store <= '1' after 100 ps;
 		when "00111" =>		-- I/O
@@ -127,12 +135,6 @@ begin
 		when "01110" =>		-- store indirect
 			dec.indls <= '1' after 100 ps;
 			dec.store <= '1' after 100 ps;
-		when "01111" =>		-- loadhl
-			dec.loadhl <= '1' after 100 ps;
-			dec.ahl_ena <= '1' after 100 ps;
-		when "10000" =>		-- loadhh
-			dec.loadhh <= '1' after 100 ps;
-			dec.ahh_ena <= '1' after 100 ps;
 		when others =>
 			null;
 	end case;

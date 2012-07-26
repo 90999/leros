@@ -36,7 +36,7 @@ use ieee.numeric_std.all;
 package leros_types is
 
 	-- should this later go to a lerso_config package?
-	constant DM_BITS : integer := 9;
+	constant DM_BITS : integer := 26;
 	constant IM_BITS : integer := 26;
 
 	type alu_log_type is (op_and, op_or, op_xor, op_ld);
@@ -77,7 +77,8 @@ package leros_types is
 	end record;
 	
 	type im_cache_out_type is record
-		addr : std_logic_vector(IM_BITS-2 downto 0);
+		addr : std_logic_vector(IM_BITS downto 0);
+		len : std_logic_vector(5 downto 0);
 		req : std_logic;
 		rden : std_logic;
 	end record;
@@ -96,6 +97,7 @@ package leros_types is
 		dec : decode_type;
 		imm : std_logic_vector(31 downto 0);
 		dm_addr : std_logic_vector(DM_BITS-1 downto 0);
+		dm_indr : std_logic;
 		pc : std_logic_vector(IM_BITS-1 downto 0);
 		valid : std_logic;
 	end record;

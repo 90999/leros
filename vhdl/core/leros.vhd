@@ -46,7 +46,9 @@ entity leros is
 		clk : in std_logic;
 		reset : in std_logic;
 		ioout : out io_out_type;
-		ioin : in io_in_type
+		ioin : in io_in_type;
+		icache_in : in im_cache_in_type;
+		icache_out : out im_cache_out_type
 	);
 end leros;
 
@@ -69,7 +71,7 @@ begin
 	
 	
 	fd: entity work.leros_fedec port map (
-		clk, reset, fdin, fdout
+		clk, reset, fdin, fdout, icache_in, icache_out
 	);
 	ex: entity work.leros_ex port map(
 		clk, reset, fdout, ioin, exout

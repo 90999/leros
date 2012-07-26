@@ -54,7 +54,13 @@ port (
 --	rsrx	: in std_logic;
 	rstx	: out std_logic;
 	ser_txd : out std_logic;
-	ser_rxd : in std_logic
+	ser_rxd : in std_logic;
+	icaddr : out std_logic_vector(IM_BITS downto 0);
+	iclen : out std_logic_vector(5 downto 0);
+	icreq : out std_logic;
+	icrden : out std_logic;
+	icdata : in std_logic_vector(31 downto 0);
+	icempty : in std_logic
 );
 end leros_nexys2;
 
@@ -71,6 +77,9 @@ architecture rtl of leros_nexys2 is
 	signal ioin : io_in_type;
 	
 	signal outp 			: std_logic_vector(15 downto 0);
+	
+	signal icache_in : im_cache_in_type;
+	signal icache_out : im_cache_out_type;
 	
 begin
 
@@ -94,7 +103,14 @@ end process;
 
 
 	cpu: entity work.leros
-		port map(clk_int, int_res, ioout, ioin);
+		port map(clk_int, int_res, ioout, ioin, icache_in, icache_out);
+		
+	icaddr <= icache_out.addr;
+	iclen <= icache_out.len;
+	icreq <= icache_out.req;
+	icrden <= icache_out.rden;
+	icache_in.data <= icdata;
+	icache_in.empty <= icempty;
 
 	ua: entity work.uart generic map (
 		clk_freq => 100000000,

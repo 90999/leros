@@ -47,20 +47,34 @@ entity leros_im is
 		clk : in std_logic;
 		reset : in std_logic;
 		din : in im_in_type;
-		dout : out im_out_type
+		dout : out im_out_type;
+		cache_in : in im_cache_in_type;
+		cache_out : out im_cache_out_type
 	);
 end leros_im;
 
 architecture rtl of leros_im is
 
-	signal areg		: std_logic_vector(IM_BITS-1 downto 0);
-	signal DOA		: std_logic_vector(31 downto 0);
-	signal TAGO		: std_logic_vector(31 downto 0);
-	signal ADDRA   : std_logic_vector(13 downto 0);
-	signal tag		: std_logic_vector(15 downto 0);
+	type CACHE_STATE_T is (IDLE,WAIT_FOR_DATA,TRANSFER_DATA,DELAY);
+	signal cache_state : CACHE_STATE_T := IDLE;
+
+	signal areg				: std_logic_vector(IM_BITS-1 downto 0);
+	signal DOA				: std_logic_vector(31 downto 0);
+	signal DIB				: std_logic_vector(31 downto 0);
+	signal TAGO				: std_logic_vector(31 downto 0);
+	signal TAGI				: std_logic_vector(31 downto 0);
+	signal ADDRA   		: std_logic_vector(13 downto 0);
+	signal ADDRB 			: std_logic_vector(13 downto 0);
+	signal tag				: std_logic_vector(15 downto 0);
+	signal WEB				: std_logic_vector(3 downto 0);
 	
-	signal gndv    : std_logic_vector(31 downto 0);
-	signal vccv    : std_logic_vector(15 downto 0);
+	signal gndv    		: std_logic_vector(31 downto 0);
+	signal vccv    		: std_logic_vector(15 downto 0);
+	
+	signal cache_miss 	: std_logic;
+	signal cache_wraddr 	: std_logic_vector(8 downto 0);
+	signal cache_reqaddr	: std_logic_vector(IM_BITS-1 downto 0);
+	signal words			: std_logic_vector(2 downto 0);
 
 begin
 
@@ -72,7 +86,11 @@ vccv <= "1111111111111111";
 	ADDRA <= din.rdaddr(9 downto 0) & "0000" after 100 ps;
 	tag <= TAGO(15 downto 0) after 100 ps;
 	
-	dout.valid <= '1' when tag = areg(25 downto 10) else '0' after 100 ps;
+	ADDRB <= cache_wraddr & "00000" after 100 ps;
+	
+	dout.valid <= '1' when cache_miss = '0' else '0' after 100 ps;
+	
+	cache_miss <= '1' when tag /= areg(25 downto 10) else '0' after 100 ps;
 	
 	process(clk)
 	begin
@@ -90,7 +108,7 @@ vccv <= "1111111111111111";
    generic map (
       -- DATA_WIDTH_A/DATA_WIDTH_B: 0, 1, 2, 4, 9, 18, or 36
       DATA_WIDTH_A => 18,
-      DATA_WIDTH_B => 18,
+      DATA_WIDTH_B => 36,
       -- DOA_REG/DOB_REG: Optional output register (0 or 1)
       DOA_REG => 0,
       DOB_REG => 0,
@@ -210,14 +228,14 @@ vccv <= "1111111111111111";
       DIA => gndv(31 downto 0),       -- 32-bit input: A port data input
       DIPA => gndv(3 downto 0),     -- 4-bit input: A port parity input
       -- Port B Address/Control Signals: 14-bit (each) input: Port B address and control signals
-      ADDRB => gndv(13 downto 0),   -- 14-bit input: B port address input
-      CLKB => gndv(0),     -- 1-bit input: B port clock input
-      ENB => gndv(0),       -- 1-bit input: B port enable input
+      ADDRB => ADDRB,   -- 14-bit input: B port address input
+      CLKB => clk,     -- 1-bit input: B port clock input
+      ENB => vccv(0),       -- 1-bit input: B port enable input
       REGCEB => gndv(0), -- 1-bit input: B port register clock enable input
       RSTB => gndv(0),     -- 1-bit input: B port register set/reset input
-      WEB => gndv(3 downto 0),       -- 4-bit input: Port B byte-wide write enable input
+      WEB => WEB,       -- 4-bit input: Port B byte-wide write enable input
       -- Port B Data: 32-bit (each) input: Port B data
-      DIB => gndv(31 downto 0),       -- 32-bit input: B port data input
+      DIB => DIB,       -- 32-bit input: B port data input
       DIPB => gndv(3 downto 0)      -- 4-bit input: B port parity input
    );
 
@@ -225,7 +243,7 @@ vccv <= "1111111111111111";
    generic map (
       -- DATA_WIDTH_A/DATA_WIDTH_B: 0, 1, 2, 4, 9, 18, or 36
       DATA_WIDTH_A => 18,
-      DATA_WIDTH_B => 18,
+      DATA_WIDTH_B => 36,
       -- DOA_REG/DOB_REG: Optional output register (0 or 1)
       DOA_REG => 0,
       DOB_REG => 0,
@@ -345,15 +363,57 @@ vccv <= "1111111111111111";
       DIA => gndv(31 downto 0),       -- 32-bit input: A port data input
       DIPA => gndv(3 downto 0),     -- 4-bit input: A port parity input
       -- Port B Address/Control Signals: 14-bit (each) input: Port B address and control signals
-      ADDRB => gndv(13 downto 0),   -- 14-bit input: B port address input
-      CLKB => gndv(0),     -- 1-bit input: B port clock input
-      ENB => gndv(0),       -- 1-bit input: B port enable input
+      ADDRB => ADDRB,   -- 14-bit input: B port address input
+      CLKB => clk,     -- 1-bit input: B port clock input
+      ENB => vccv(0),       -- 1-bit input: B port enable input
       REGCEB => gndv(0), -- 1-bit input: B port register clock enable input
       RSTB => gndv(0),     -- 1-bit input: B port register set/reset input
-      WEB => gndv(3 downto 0),       -- 4-bit input: Port B byte-wide write enable input
+      WEB => WEB,       -- 4-bit input: Port B byte-wide write enable input
       -- Port B Data: 32-bit (each) input: Port B data
-      DIB => gndv(31 downto 0),       -- 32-bit input: B port data input
+      DIB => TAGI,       -- 32-bit input: B port data input
       DIPB => gndv(3 downto 0)      -- 4-bit input: B port parity input
    );
+	
+	--Memory subsystem uses byte addresses
+	cache_out.addr <= cache_reqaddr & "0";
+	
+	TAGI <= cache_reqaddr(25 downto 10) & cache_reqaddr(25 downto 10);
+	
+	--Cache fill
+	process(clk)
+	begin
+		if clk='1' and clk'Event then
+			if cache_state = IDLE then
+				cache_out.req <= '0' after 100 ps;
+				cache_out.rden <= '0' after 100 ps;
+				WEB <= "0000" after 100 ps;
+				if cache_miss = '1' then
+					cache_reqaddr <= areg(IM_BITS-1 downto 3) & "000" after 100 ps;
+					cache_out.req <= '1' after 100 ps;
+					cache_out.len <= "000111" after 100 ps;
+					cache_state <= WAIT_FOR_DATA after 100 ps;
+					words <= "000";
+				end if;
+			elsif cache_state = WAIT_FOR_DATA then
+				cache_out.req <= '0' after 100 ps;
+				if cache_in.empty = '0' then
+					cache_state <= TRANSFER_DATA after 100 ps;
+				end if;
+			elsif cache_state = TRANSFER_DATA then
+				--write the crap into the imem and tag ram
+				words <= std_logic_vector(unsigned(words)+1) after 100 ps;
+				cache_wraddr <= cache_reqaddr(8 downto 3) & words;
+				DIB <= cache_in.data after 100 ps;
+				WEB <= "1111" after 100 ps;
+				if cache_in.empty = '1' then
+					cache_state <= DELAY after 100 ps;
+					WEB <= "0000" after 100 ps;
+				end if;
+			else --if state = DELAY
+				--Delay an extra cycle to make sure the new tags propagate to the other side of the cache
+				cache_state <= IDLE after 100 ps;
+			end if;
+		end if;
+	end process;
 
 end rtl;

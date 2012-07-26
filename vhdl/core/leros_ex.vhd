@@ -69,28 +69,24 @@ architecture rtl of leros_ex is
 	signal accu, opd  : unsigned(31 downto 0);
 	signal log, arith, a_mux : unsigned (31 downto 0);
 	
-	-- the data ram
-	constant nwords : integer := 2 ** DM_BITS;
-	type ram_type is array(0 to nwords-1) of std_logic_vector(31 downto 0);
-
-	-- 0 initialization is for simulation only
-	-- Xilinx and Altera FPGA initialize memory blocks to 0
-	signal dm : ram_type := (others => (others => '0'));
-	
 	signal wrdata, rddata : std_logic_vector(31 downto 0);
 	signal wraddr, rdaddr : std_logic_vector(DM_BITS-1 downto 0);
 	
 	signal wraddr_dly : std_logic_vector(DM_BITS-1 downto 0);
 	signal pc_dly : std_logic_vector(IM_BITS-1 downto 0);
 	
+	signal rdaddr_indr, wraddr_indr : std_logic;
+	signal wraddr_indr_dly : std_logic;
 
 begin
 
 	dout.accu <= std_logic_vector(accu) after 100 ps;
 	dout.dm_data <= rddata after 100 ps;
 	rdaddr <= din.dm_addr after 100 ps;
+	rdaddr_indr <= din.dm_indr after 100 ps;
 	-- address for the write needs one cycle delay
 	wraddr <= wraddr_dly after 100 ps;
+	wraddr_indr <= wraddr_indr_dly after 100 ps;
 	
 --todo add high word	
 process(din, rddata)
@@ -173,6 +169,7 @@ begin
 				accu(31 downto 24) <= a_mux(31 downto 24) after 100 ps;
 			end if;
 			wraddr_dly <= din.dm_addr after 100 ps;
+			wraddr_indr_dly <= din.dm_indr after 100 ps;
 			pc_dly <= din.pc after 100 ps;
 				-- a simple output port for the hello world example
 	--		if din.dec.outp='1' then
@@ -182,22 +179,9 @@ begin
 	end if;
 end process;
 
--- the data memory (DM)
--- read during write is usually undefined in an FPGA,
--- but that is not modelled
-process (clk)
-begin
-	if rising_edge(clk) then
-		if din.valid = '1' then
-			-- is store overloaded?
-			-- now we have only 'register' read and write
-			if din.dec.store='1' then
-				dm(to_integer(unsigned(wraddr))) <= wrdata after 100 ps;
-			end if;
-			rddata <= dm(to_integer(unsigned(rdaddr))) after 100 ps;
-		end if;
-	end if;
-end process;
+	dcache: entity work.leros_dcache port map(
+		clk, reset, din.valid, din.dec.store,wraddr,rdaddr,wraddr_indr,rdaddr_indr,wrdata,rddata
+	);
 
 	
 end rtl;

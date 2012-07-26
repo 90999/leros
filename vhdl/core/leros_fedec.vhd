@@ -146,6 +146,7 @@ end process;
 dout.valid <= all_valid;
 imin.valid <= all_valid;
 all_valid <= '1' when imout.valid = '1' and din.dmiss = '0' else '0';
+dout.decode <= decode;
 	
 -- pc register
 process(clk, reset)

@@ -88,7 +88,7 @@ begin
 	rdaddr <= din.dm_addr after 100 ps;
 	
 	--TODO: pretty sure this is all wrong. dec is cycle delayed decode
-	rdaddr_indr <= din.dec.indls and not din.dec.store after 100 ps;
+	rdaddr_indr <= din.decode.indls and not din.decode.store after 100 ps;
 	-- address for the write needs one cycle delay
 	wraddr <= wraddr_dly after 100 ps;
 	wraddr_indr <= din.dec.indls and din.dec.store  after 100 ps;

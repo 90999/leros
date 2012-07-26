@@ -110,6 +110,7 @@ package leros_types is
 
 	type fedec_out_type is record
 		dec : decode_type;
+		decode : decode_type;
 		imm : std_logic_vector(31 downto 0);
 		dm_addr : std_logic_vector(DM_BITS-1 downto 0);
 		pc : std_logic_vector(IM_BITS-1 downto 0);

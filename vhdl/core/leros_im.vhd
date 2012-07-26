@@ -131,13 +131,13 @@ vccv <= "1111111111111111";
 	begin
 		if clk='1' and clk'Event then
 			--Otherwise we have trouble with the initial cache miss
-			if cache_miss = '0' or reset = '1' then
+			if din.valid = '1' or reset = '1' then
 				areg <= din.rdaddr after 100 ps;
 			end if;
 		end if;
 	end process;
 	
-	latched_addr <= din.rdaddr when cache_miss = '0' else areg after 100 ps;
+	latched_addr <= din.rdaddr when din.valid = '1' else areg after 100 ps;
 	
   IRAM_INST : instr_mem
   PORT MAP (

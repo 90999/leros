@@ -102,7 +102,7 @@ END COMPONENT;
 	
 	signal cache_reqaddr	: std_logic_vector(IM_BITS-2 downto 0);
 	signal words			: std_logic_vector(2 downto 0);
-	signal req, cache_write : std_logic;
+	signal req, cache_write, cache_sel : std_logic;
 	signal validq : std_logic := '0';
 	signal rdindrq, wrindrq : std_logic;
 	signal stall : std_logic;
@@ -111,6 +111,9 @@ begin
 
 	vccv <= X"FFFFFFFF";
 	gndv <= X"00000000";
+	
+	--TODO: we almost need to pipeline writes because the tag isn't known until
+	--after the cycle that could clobber data
 
 
 	latched_rdaddr <= rdaddr when rdmiss='0' else rdaddrq after 100 ps;
@@ -137,18 +140,18 @@ begin
 	end process;
 
 
-	dmem_wraddr <= cache_wraddr when cache_write = '1' else latched_wraddr(8 downto 0) after 100 ps;	
+	dmem_wraddr <= cache_wraddr when cache_sel = '1' else latched_wraddr(8 downto 0) after 100 ps;	
 	mem_wraddr <= latched_wraddr(8 downto 0) after 100 ps;
 	mem_rdaddr <= latched_rdaddr(8 downto 0) after 100 ps;
 	
-	dmem_wrdata <= cache_din when cache_write = '1' else wrdata;
+	dmem_wrdata <= cache_din when cache_sel = '1' else wrdata;
 	
 
 	reg_we <= "1111" when store = '1' and wrindr = '0' else "0000" after 100 ps;
 	cache_we <= "1111" when (store = '1' and wrindr = '1') or cache_write = '1' else "0000" after 100 ps;
 	tag_we <= "1111" when cache_write = '1' else "0000" after 100 ps;
 	
-	rddata <= rddata_cache when rdindr = '1' else rddata_reg after 100 ps;
+	rddata <= rddata_cache when rdindrq = '1' else rddata_reg after 100 ps;
 
 	DRAM_reg_inst : data_mem
 	PORT MAP (
@@ -213,12 +216,14 @@ begin
 				req <= '0' after 100 ps;
 				cache_out.rden <= '0' after 100 ps;
 				cache_write <= '0' after 100 ps;
+				cache_sel <= '0' after 100 ps;
 				stall <= '0';
 			else
 				if cache_state = IDLE then
 					req <= '0' after 100 ps;
 					cache_out.rden <= '0' after 100 ps;
 					cache_write <= '0' after 100 ps;
+					cache_sel <= '0' after 100 ps;
 					stall <= '0' after 100 ps;
 
 					--TODO: flush the line if its dirty
@@ -247,6 +252,7 @@ begin
 					words <= std_logic_vector(unsigned(words)+1) after 100 ps;
 					cache_wraddr <= cache_reqaddr(8 downto 3) & words;
 					cache_write <= '1' after 100 ps;
+					cache_sel <= '1' after 100 ps;
 					cache_din <= cache_in.data after 100 ps;
 					cache_out.rden <= '1' after 100 ps;
 --					WEB <= "1111" after 100 ps;
@@ -254,11 +260,16 @@ begin
 						cache_out.rden <= '0' after 100 ps;
 						cache_state <= DELAY after 100 ps;
 --						WEB <= "0000" after 100 ps;
-						cache_write <= '0' after 100 ps;
+						cache_sel <= '0' after 100 ps;
+						--if this was a write then get the cache to update
+						if rdmiss='1' then
+							cache_write <= '0' after 100 ps;
+						end if;
 					end if;
 				else --if state = DELAY
 					--Delay an extra cycle to make sure the new tags propagate to the other side of the cache
 					cache_state <= IDLE after 100 ps;
+					cache_write <= '0' after 100 ps;
 					stall <= '0' after 100 ps;
 				end if;
 			end if;

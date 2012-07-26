@@ -105,6 +105,7 @@ package leros_types is
 		accu : std_logic_vector(31 downto 0);
 		dm_data : std_logic_vector(31 downto 0);
 		dmiss : std_logic;
+		zf : std_logic;
 	end record;
 
 	type fedec_out_type is record
@@ -124,6 +125,7 @@ package leros_types is
 		accu : std_logic_vector(31 downto 0);
 		dm_data : std_logic_vector(31 downto 0);
 		dmiss : std_logic;
+		zf : std_logic;
 	end record;
 	
 	type io_out_type is record

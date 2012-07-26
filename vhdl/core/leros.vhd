@@ -67,6 +67,7 @@ begin
 	fdin.accu <= exout.accu;
 	fdin.dm_data <= exout.dm_data;
 	fdin.dmiss <= exout.dmiss;
+	fdin.zf <= exout.zf;
 	ioout.addr <= fdout.imm(7 downto 0);
 	ioout.rd <= fdout.dec.inp;
 	ioout.wr <= fdout.dec.outp;

@@ -92,7 +92,7 @@ end process;
 process(decode, din, do_branch, imout, pc, pc_add, pc_op, zf)
 begin
 	-- should be checked in ModelSim
-	if unsigned(din.accu)=0 then
+  	if unsigned(din.accu)=0 then
 		zf <= '1' after 100 ps;
 	else
 		zf <= '0' after 100 ps;

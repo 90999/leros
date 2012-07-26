@@ -78,11 +78,13 @@ architecture rtl of leros_ex is
 	signal pc_dly : std_logic_vector(IM_BITS-1 downto 0);
 	
 	signal rdaddr_indr, wraddr_indr : std_logic;
-
+	signal zf : std_logic;
+	
 begin
 
 	dout.accu <= std_logic_vector(accu) after 100 ps;
 	dout.dm_data <= rddata after 100 ps;
+	dout.zf <= zf after 100 ps;
 	rdaddr <= din.dm_addr after 100 ps;
 	
 	--TODO: pretty sure this is all wrong. dec is cycle delayed decode
@@ -170,6 +172,11 @@ begin
 			end if;
 			wraddr_dly <= din.dm_addr after 100 ps;
 			pc_dly <= din.pc after 100 ps;
+			if unsigned(a_mux(15 downto 0)) = 0 then
+				zf <= '1' after 100 ps;
+			else
+				zf <= '0' after 100 ps;
+			end if;
 				-- a simple output port for the hello world example
 	--		if din.dec.outp='1' then
 	--			dout.outp <= std_logic_vector(accu);

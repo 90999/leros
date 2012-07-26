@@ -51,17 +51,25 @@ ARCHITECTURE behavior OF leros_test IS
 			icreq : out std_logic;
 			icrden : out std_logic;
 			icdata : in std_logic_vector(31 downto 0);
-			icempty : in std_logic
+			icempty : in std_logic;
+			dcaddr : out std_logic_vector(26 downto 0);
+			dclen : out std_logic_vector(5 downto 0);
+			dcreq : out std_logic;
+			dcrden : out std_logic;
+			dcdata : in std_logic_vector(31 downto 0);
+			dcempty : in std_logic
         );
     END COMPONENT;
     
 	type IMEM_STATE_T is (WAIT_FOR_REQ,TRANSFER);
 	signal state : IMEM_STATE_T := WAIT_FOR_REQ;
+	signal dstate : IMEM_STATE_T := WAIT_FOR_REQ;
 
 	-- the data ram
-	constant nwords : integer := 2 ** 10;
+	constant nwords : integer := 2 ** 13;
 	type ram_type is array(0 to nwords-1) of std_logic_vector(31 downto 0);
 	signal dm : ram_type;
+	signal dm2 : ram_type := (others => (others => '0'));
 	
 
    --Inputs
@@ -77,6 +85,16 @@ ARCHITECTURE behavior OF leros_test IS
 	signal icrden : std_logic;
 	signal icdata : std_logic_vector(31 downto 0);
 	signal icempty : std_logic;
+	
+	signal dcaddr : std_logic_vector(26 downto 0);
+	signal daddr : std_logic_vector(24 downto 0);
+	signal dclen : std_logic_vector(5 downto 0);
+	signal dcount : std_logic_vector(5 downto 0);
+	signal dlen : std_logic_vector(5 downto 0);
+	signal dcreq : std_logic;
+	signal dcrden : std_logic;
+	signal dcdata : std_logic_vector(31 downto 0);
+	signal dcempty : std_logic;
 
  	--Outputs
    signal led : std_logic_vector(7 downto 0);
@@ -100,7 +118,13 @@ BEGIN
 			 icreq => icreq,
 			 icrden => icrden,
 			 icdata => icdata,
-			 icempty => icempty
+			 icempty => icempty,
+			 dcaddr => dcaddr,
+			 dclen => dclen,
+			 dcreq => dcreq,
+			 dcrden => dcrden,
+			 dcdata => dcdata,
+			 dcempty => dcempty
         );
 
    -- Clock process definitions
@@ -144,7 +168,38 @@ BEGIN
 		end if;
 	end process;
  
-
+	process(clk)
+	begin
+		if clk='1' and clk'Event and rstx = '0' then
+			if dstate = WAIT_FOR_REQ then
+				dcempty <= '1' after 100 ps;
+				if dcreq = '1' then
+					dstate <= TRANSFER after 100 ps;
+					dlen <= dclen after 100 ps;
+					daddr <= dcaddr(26 downto 2) after 100 ps;
+					dcount <= "000000" after 100 ps;
+				end if;
+			else
+				if dcount <= dlen then
+						dcdata <= dm2(to_integer(unsigned(daddr)+unsigned(dcount))) after 100 ps;
+						dcempty <= '0' after 100 ps;
+					if dcrden='1' then
+						if dcount < dlen then
+							dcdata <= dm2(to_integer(unsigned(daddr)+unsigned(dcount)+1)) after 100 ps;
+						else
+							dcempty <= '1' after 100 ps;
+							dstate <= WAIT_FOR_REQ after 100 ps;
+						end if;
+						dcount <= std_logic_vector(unsigned(dcount) + 1) after 100 ps;
+					end if;
+				else
+					dcempty <= '1' after 100 ps;
+					dstate <= WAIT_FOR_REQ after 100 ps;
+				end if;
+			end if;
+		end if;
+	end process;
+	
    -- Stimulus process
    stim_proc: process
    begin		
@@ -196,7 +251,7 @@ dm(30) <= X"00004000";
 dm(31) <= X"30022174";
 dm(32) <= X"00002166";
 dm(33) <= X"00004000";
-dm(34) <= X"3002210a";
+dm(34) <= X"3002210a"; --this one
 dm(35) <= X"29002190";
 dm(36) <= X"2f002d00";
 dm(37) <= X"40000000";
@@ -274,9 +329,6 @@ dm(108) <= X"00000000";
 dm(109) <= X"00000000";
 dm(110) <= X"00000000";
 dm(111) <= X"00000000";
-
-
-
 
 
 

@@ -44,7 +44,7 @@ import org.antlr.runtime.CommonTokenStream;
 
 import leros.asm.generated.*;
 
-public class LerosAsm {
+public class LerosAsm { 
 
 	static final int ADDRBITS = 9;
 	static final int DATABITS = 16;
@@ -130,6 +130,10 @@ public class LerosAsm {
 			
 			romvhd.write(getRomHeader());
 
+			while(list.size() % 16 != 0)
+				list.add(0);
+
+			System.out.printf("     INIT_00 => X\"");
 			Object o[] = list.toArray();
 			for (int i = 0; i < o.length; ++i) {
 				int val = ((Integer) o[i]).intValue();
@@ -138,6 +142,24 @@ public class LerosAsm {
 						+ bin(val, DATABITS) + "\";");
 //				romvhd.write(" -- " + inraw.readLine() + "\n");
 				romvhd.write("\n");
+
+			
+				val = (Integer)o[(i/16)*16+(15-i%16)];
+				System.out.printf("%04x", val);
+				if(i%16==15)
+					System.out.printf("\",\n      INIT_%02X => X\"",(i+1)/16);
+
+			}
+
+			System.out.printf("\ndm(0) <= X\"");
+			for (int i = 0; i < o.length; ++i) {
+				int val = ((Integer) o[i]).intValue();
+
+			
+				val = (Integer)o[(i/2)*2+(1-i%2)];
+				System.out.printf("%04x", val);
+				if(i%2==1)
+					System.out.printf("\";\ndm(%d) <= X\"",(i+1)/2);
 
 			}
 
@@ -195,7 +217,9 @@ public class LerosAsm {
 		// parser.dump();
 		parser.reset();
 		List code = parser.pass2();
-		System.out.println(code);
+
+		System.out.println("foo");		
+	//	System.out.println(code);
 
 		la.dump(code);
 	}

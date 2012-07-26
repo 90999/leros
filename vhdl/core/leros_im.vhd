@@ -55,13 +55,29 @@ end leros_im;
 
 architecture rtl of leros_im is
 
+COMPONENT tag_mem 
+  PORT (
+    clka : IN STD_LOGIC;
+    wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    addra : IN STD_LOGIC_VECTOR(9 DOWNTO 0);
+    dina : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    douta : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+    clkb : IN STD_LOGIC;
+    web : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    addrb : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
+    dinb : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+    doutb : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+  );
+END COMPONENT;
+
 	type CACHE_STATE_T is (IDLE,WAIT_FOR_DATA,TRANSFER_DATA,DELAY);
 	signal cache_state : CACHE_STATE_T := IDLE;
 
 	signal areg				: std_logic_vector(IM_BITS-1 downto 0);
-	signal DOA				: std_logic_vector(31 downto 0);
+	signal latched_addr	: std_logic_vector(IM_BITS-1 downto 0);
+	signal DOA				: std_logic_vector(15 downto 0);
 	signal DIB				: std_logic_vector(31 downto 0);
-	signal TAGO				: std_logic_vector(31 downto 0);
+	signal TAGO				: std_logic_vector(15 downto 0);
 	signal TAGI				: std_logic_vector(31 downto 0);
 	signal ADDRA   		: std_logic_vector(13 downto 0);
 	signal ADDRB 			: std_logic_vector(13 downto 0);
@@ -75,6 +91,7 @@ architecture rtl of leros_im is
 	signal cache_wraddr 	: std_logic_vector(8 downto 0);
 	signal cache_reqaddr	: std_logic_vector(IM_BITS-1 downto 0);
 	signal words			: std_logic_vector(2 downto 0);
+	signal req				: std_logic;
 
 begin
 
@@ -83,7 +100,7 @@ vccv <= "1111111111111111";
 
 	dout.data <= DOA(15 downto 0) after 100 ps;
 	
-	ADDRA <= din.rdaddr(9 downto 0) & "0000" after 100 ps;
+	ADDRA <= latched_addr(9 downto 0) & "0000" after 100 ps;
 	tag <= TAGO(15 downto 0) after 100 ps;
 	
 	ADDRB <= cache_wraddr & "00000" after 100 ps;
@@ -92,326 +109,100 @@ vccv <= "1111111111111111";
 	
 	cache_miss <= '1' when tag /= areg(25 downto 10) else '0' after 100 ps;
 	
+	--TODO: after a stall the icache is trying to clock the wrong address to output
+	--and the tag comparison becomes invalid after the first clock
+	
 	process(clk)
 	begin
 		if clk='1' and clk'Event then
-			areg <= din.rdaddr after 100 ps;
+			--Otherwise we have trouble with the initial cache miss
+			if cache_miss = '0' or reset = '1' then
+				areg <= din.rdaddr after 100 ps;
+			end if;
 		end if;
 	end process;
 	
-	--rom: entity work.leros_rom port map(areg, data);
-	  -- RAMB16BWER: 16k-bit Data and 2k-bit Parity Configurable Synchronous Dual Port Block RAM with Optional Output Registers
-   --             Spartan-6
-   -- Xilinx HDL Language Template, version 13.2
-
-   IRAM_inst : RAMB16BWER
-   generic map (
-      -- DATA_WIDTH_A/DATA_WIDTH_B: 0, 1, 2, 4, 9, 18, or 36
-      DATA_WIDTH_A => 18,
-      DATA_WIDTH_B => 36,
-      -- DOA_REG/DOB_REG: Optional output register (0 or 1)
-      DOA_REG => 0,
-      DOB_REG => 0,
-      -- EN_RSTRAM_A/EN_RSTRAM_B: Enable/disable RST
-      EN_RSTRAM_A => TRUE,
-      EN_RSTRAM_B => TRUE,
-      -- INITP_00 to INITP_07: Initial memory contents.
-      INITP_00 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_01 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_02 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_03 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_04 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_05 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_06 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_07 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      -- INIT_00 to INIT_3F: Initial memory contents.
-      INIT_00 => X"40010000212530002172400100002125300021654001000021253000214c0000",
-      INIT_01 => X"210a4001000021253000210d400100002125300021734001000021253000216f",
-      INIT_02 => X"000000004001000020013801200049fd000023013c0048dd4001000021253000",
-      INIT_03 => X"300d20083033300e200d3033200b30350c33000000004b0a200d3033200b3035",
-      INIT_04 => X"20330c353033301e4809200b3033200d303520330c353033301e200e3033200c",
-      INIT_05 => X"30350c33000000004b0c200e3033480248ba200c303520330c35303330204809",
-      INIT_06 => X"200c3033200e303520330c35303330203033000000004a0248ec201e30330000",
-      INIT_07 => X"00004a0248e6200b3033200d30350c33000000004b0421ff3022480321013022",
-      INIT_08 => X"200c3033200e30350c33000000004b0421ff3024480321013024201e30332020",
-      INIT_09 => X"303520330c35000000004c58202030330833303330263033201e303508353035",
-      INIT_0A => X"20330c353033302820263033201e303520330c353033300f201e303300000000",
-      INIT_0B => X"4c6220093033480248a420333800200a30333800200b30333800200c30333800",
-      INIT_0C => X"200b30332022303508333033300b200f3033000000004c094908200c30332024",
-      INIT_0D => X"303508333033300c200f3033000000004c0a4909200f30332028303508333033",
-      INIT_0E => X"300f4808200f30332026303508333033300f201e0d01301e48c0201e30330833",
-      INIT_0F => X"303330263033202030350835303520330c353033302820263033202030352033",
-      INIT_10 => X"0c353033300f20203033000000004c0b20093033480248a920333800200a3033",
-      INIT_11 => X"3800200b30333800200c30333800200c30332024303508333033300c200f3033",
-      INIT_12 => X"000000004c094908200b30332022303508333033300b200f3033000000004c0a",
-      INIT_13 => X"4909200f30332028303508333033300f4808200f30332026303508333033300f",
-      INIT_14 => X"20200d01302048c0000000000000000000000000000000000000000000000000",
-      INIT_15 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_16 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_17 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_18 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_19 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1A => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1B => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1C => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1D => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1E => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1F => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_20 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_21 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_22 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_23 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_24 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_25 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_26 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_27 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_28 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_29 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2A => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2B => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2C => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2D => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2E => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2F => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_30 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_31 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_32 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_33 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_34 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_35 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_36 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_37 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_38 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_39 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3A => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3B => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3C => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3D => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3E => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3F => X"0000000000000000000000000000000000000000000000000000000000000000",
-      -- INIT_A/INIT_B: Initial values on output port
-      INIT_A => X"000000000",
-      INIT_B => X"000000000",
-      -- INIT_FILE: Optional file used to specify initial RAM contents
-      INIT_FILE => "NONE",
-      -- RSTTYPE: "SYNC" or "ASYNC" 
-      RSTTYPE => "SYNC",
-      -- RST_PRIORITY_A/RST_PRIORITY_B: "CE" or "SR" 
-      RST_PRIORITY_A => "CE",
-      RST_PRIORITY_B => "CE",
-      -- SIM_COLLISION_CHECK: Collision check enable "ALL", "WARNING_ONLY", "GENERATE_X_ONLY" or "NONE" 
-      SIM_COLLISION_CHECK => "ALL",
-      -- SIM_DEVICE: Must be set to "SPARTAN6" for proper simulation behavior
-      SIM_DEVICE => "SPARTAN6",
-      -- SRVAL_A/SRVAL_B: Set/Reset value for RAM output
-      SRVAL_A => X"000000000",
-      SRVAL_B => X"000000000",
-      -- WRITE_MODE_A/WRITE_MODE_B: "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE" 
-      WRITE_MODE_A => "WRITE_FIRST",
-      WRITE_MODE_B => "WRITE_FIRST" 
-   )
-   port map (
-      -- Port A Data: 32-bit (each) output: Port A data
-      DOA => DOA,       -- 32-bit output: A port data output
-  --    DOPA => DOPA,     -- 4-bit output: A port parity output
-      -- Port B Data: 32-bit (each) output: Port B data
-  --    DOB => DOB,       -- 32-bit output: B port data output
-  --    DOPB => DOPB,     -- 4-bit output: B port parity output
-      -- Port A Address/Control Signals: 14-bit (each) input: Port A address and control signals
-      ADDRA => ADDRA,   -- 14-bit input: A port address input
-      CLKA => clk,     -- 1-bit input: A port clock input
-      ENA => vccv(0),       -- 1-bit input: A port enable input
-      REGCEA => vccv(0), -- 1-bit input: A port register clock enable input
-      RSTA => gndv(0),     -- 1-bit input: A port register set/reset input
-      WEA => gndv(3 downto 0),       -- 4-bit input: Port A byte-wide write enable input
-      -- Port A Data: 32-bit (each) input: Port A data
-      DIA => gndv(31 downto 0),       -- 32-bit input: A port data input
-      DIPA => gndv(3 downto 0),     -- 4-bit input: A port parity input
-      -- Port B Address/Control Signals: 14-bit (each) input: Port B address and control signals
-      ADDRB => ADDRB,   -- 14-bit input: B port address input
-      CLKB => clk,     -- 1-bit input: B port clock input
-      ENB => vccv(0),       -- 1-bit input: B port enable input
-      REGCEB => gndv(0), -- 1-bit input: B port register clock enable input
-      RSTB => gndv(0),     -- 1-bit input: B port register set/reset input
-      WEB => WEB,       -- 4-bit input: Port B byte-wide write enable input
-      -- Port B Data: 32-bit (each) input: Port B data
-      DIB => DIB,       -- 32-bit input: B port data input
-      DIPB => gndv(3 downto 0)      -- 4-bit input: B port parity input
-   );
-
-   TAGRAM_inst : RAMB16BWER
-   generic map (
-      -- DATA_WIDTH_A/DATA_WIDTH_B: 0, 1, 2, 4, 9, 18, or 36
-      DATA_WIDTH_A => 18,
-      DATA_WIDTH_B => 36,
-      -- DOA_REG/DOB_REG: Optional output register (0 or 1)
-      DOA_REG => 0,
-      DOB_REG => 0,
-      -- EN_RSTRAM_A/EN_RSTRAM_B: Enable/disable RST
-      EN_RSTRAM_A => TRUE,
-      EN_RSTRAM_B => TRUE,
-      -- INITP_00 to INITP_07: Initial memory contents.
-      INITP_00 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_01 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_02 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_03 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_04 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_05 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_06 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INITP_07 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      -- INIT_00 to INIT_3F: Initial memory contents.
-      INIT_00 => X"40010000212530002172400100002125300021654001000021253000214c0000",
-      INIT_01 => X"210a4001000021253000210d400100002125300021734001000021253000216f",
-      INIT_02 => X"000000004001000020013801200049fd000023013c0048dd4001000021253000",
-      INIT_03 => X"300d20083033300e200d3033200b30350c33000000004b0a200d3033200b3035",
-      INIT_04 => X"20330c353033301e4809200b3033200d303520330c353033301e200e3033200c",
-      INIT_05 => X"30350c33000000004b0c200e3033480248ba200c303520330c35303330204809",
-      INIT_06 => X"200c3033200e303520330c35303330203033000000004a0248ec201e30330000",
-      INIT_07 => X"00004a0248e6200b3033200d30350c33000000004b0421ff3022480321013022",
-      INIT_08 => X"200c3033200e30350c33000000004b0421ff3024480321013024201e30332020",
-      INIT_09 => X"303520330c35000000004c58202030330833303330263033201e303508353035",
-      INIT_0A => X"20330c353033302820263033201e303520330c353033300f201e303300000000",
-      INIT_0B => X"4c6220093033480248a420333800200a30333800200b30333800200c30333800",
-      INIT_0C => X"200b30332022303508333033300b200f3033000000004c094908200c30332024",
-      INIT_0D => X"303508333033300c200f3033000000004c0a4909200f30332028303508333033",
-      INIT_0E => X"300f4808200f30332026303508333033300f201e0d01301e48c0201e30330833",
-      INIT_0F => X"303330263033202030350835303520330c353033302820263033202030352033",
-      INIT_10 => X"0c353033300f20203033000000004c0b20093033480248a920333800200a3033",
-      INIT_11 => X"3800200b30333800200c30333800200c30332024303508333033300c200f3033",
-      INIT_12 => X"000000004c094908200b30332022303508333033300b200f3033000000004c0a",
-      INIT_13 => X"4909200f30332028303508333033300f4808200f30332026303508333033300f",
-      INIT_14 => X"20200d01302048c0000000000000000000000000000000000000000000000000",
-      INIT_15 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_16 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_17 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_18 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_19 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1A => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1B => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1C => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1D => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1E => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_1F => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_20 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_21 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_22 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_23 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_24 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_25 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_26 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_27 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_28 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_29 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2A => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2B => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2C => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2D => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2E => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_2F => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_30 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_31 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_32 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_33 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_34 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_35 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_36 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_37 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_38 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_39 => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3A => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3B => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3C => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3D => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3E => X"0000000000000000000000000000000000000000000000000000000000000000",
-      INIT_3F => X"0000000000000000000000000000000000000000000000000000000000000000",
-      -- INIT_A/INIT_B: Initial values on output port
-      INIT_A => X"000000000",
-      INIT_B => X"000000000",
-      -- INIT_FILE: Optional file used to specify initial RAM contents
-      INIT_FILE => "NONE",
-      -- RSTTYPE: "SYNC" or "ASYNC" 
-      RSTTYPE => "SYNC",
-      -- RST_PRIORITY_A/RST_PRIORITY_B: "CE" or "SR" 
-      RST_PRIORITY_A => "CE",
-      RST_PRIORITY_B => "CE",
-      -- SIM_COLLISION_CHECK: Collision check enable "ALL", "WARNING_ONLY", "GENERATE_X_ONLY" or "NONE" 
-      SIM_COLLISION_CHECK => "ALL",
-      -- SIM_DEVICE: Must be set to "SPARTAN6" for proper simulation behavior
-      SIM_DEVICE => "SPARTAN6",
-      -- SRVAL_A/SRVAL_B: Set/Reset value for RAM output
-      SRVAL_A => X"000000000",
-      SRVAL_B => X"000000000",
-      -- WRITE_MODE_A/WRITE_MODE_B: "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE" 
-      WRITE_MODE_A => "WRITE_FIRST",
-      WRITE_MODE_B => "WRITE_FIRST" 
-   )
-   port map (
-      -- Port A Data: 32-bit (each) output: Port A data
-      DOA => TAGO,       -- 32-bit output: A port data output
-  --    DOPA => DOPA,     -- 4-bit output: A port parity output
-      -- Port B Data: 32-bit (each) output: Port B data
-  --    DOB => DOB,       -- 32-bit output: B port data output
-  --    DOPB => DOPB,     -- 4-bit output: B port parity output
-      -- Port A Address/Control Signals: 14-bit (each) input: Port A address and control signals
-      ADDRA => ADDRA,   -- 14-bit input: A port address input
-      CLKA => clk,     -- 1-bit input: A port clock input
-      ENA => vccv(0),       -- 1-bit input: A port enable input
-      REGCEA => vccv(0), -- 1-bit input: A port register clock enable input
-      RSTA => gndv(0),     -- 1-bit input: A port register set/reset input
-      WEA => gndv(3 downto 0),       -- 4-bit input: Port A byte-wide write enable input
-      -- Port A Data: 32-bit (each) input: Port A data
-      DIA => gndv(31 downto 0),       -- 32-bit input: A port data input
-      DIPA => gndv(3 downto 0),     -- 4-bit input: A port parity input
-      -- Port B Address/Control Signals: 14-bit (each) input: Port B address and control signals
-      ADDRB => ADDRB,   -- 14-bit input: B port address input
-      CLKB => clk,     -- 1-bit input: B port clock input
-      ENB => vccv(0),       -- 1-bit input: B port enable input
-      REGCEB => gndv(0), -- 1-bit input: B port register clock enable input
-      RSTB => gndv(0),     -- 1-bit input: B port register set/reset input
-      WEB => WEB,       -- 4-bit input: Port B byte-wide write enable input
-      -- Port B Data: 32-bit (each) input: Port B data
-      DIB => TAGI,       -- 32-bit input: B port data input
-      DIPB => gndv(3 downto 0)      -- 4-bit input: B port parity input
-   );
+	latched_addr <= din.rdaddr when cache_miss = '0' else areg after 100 ps;
+	
+  IRAM_INST : tag_mem
+  PORT MAP (
+    clka => clk,
+    wea => gndv(0 downto 0),
+    addra => latched_addr(9 downto 0),
+    dina => gndv(15 downto 0),
+    douta => DOA,
+    clkb => clk,
+    web => WEB(0 downto 0),
+    addrb => cache_wraddr,
+    dinb => DIB
+--    doutb => doutb
+  );
+	
+	
+ TAGRAM_INST : tag_mem
+  PORT MAP (
+    clka => clk,
+    wea => gndv(0 downto 0),
+    addra => latched_addr(9 downto 0),
+    dina => gndv(15 downto 0),
+    douta => TAGO,
+    clkb => clk,
+    web => WEB(0 downto 0),
+    addrb => cache_wraddr,
+    dinb => TAGI
+--    doutb => doutb
+  );
 	
 	--Memory subsystem uses byte addresses
 	cache_out.addr <= cache_reqaddr & "0";
 	
 	TAGI <= cache_reqaddr(25 downto 10) & cache_reqaddr(25 downto 10);
 	
+	cache_out.req <= '0' when reset = '1' else req;
 	--Cache fill
 	process(clk)
 	begin
 		if clk='1' and clk'Event then
-			if cache_state = IDLE then
-				cache_out.req <= '0' after 100 ps;
-				cache_out.rden <= '0' after 100 ps;
-				WEB <= "0000" after 100 ps;
-				if cache_miss = '1' then
-					cache_reqaddr <= areg(IM_BITS-1 downto 3) & "000" after 100 ps;
-					cache_out.req <= '1' after 100 ps;
-					cache_out.len <= "000111" after 100 ps;
-					cache_state <= WAIT_FOR_DATA after 100 ps;
-					words <= "000";
-				end if;
-			elsif cache_state = WAIT_FOR_DATA then
-				cache_out.req <= '0' after 100 ps;
-				if cache_in.empty = '0' then
-					cache_state <= TRANSFER_DATA after 100 ps;
-				end if;
-			elsif cache_state = TRANSFER_DATA then
-				--write the crap into the imem and tag ram
-				words <= std_logic_vector(unsigned(words)+1) after 100 ps;
-				cache_wraddr <= cache_reqaddr(8 downto 3) & words;
-				DIB <= cache_in.data after 100 ps;
-				WEB <= "1111" after 100 ps;
-				if cache_in.empty = '1' then
-					cache_state <= DELAY after 100 ps;
-					WEB <= "0000" after 100 ps;
-				end if;
-			else --if state = DELAY
-				--Delay an extra cycle to make sure the new tags propagate to the other side of the cache
+			if reset='1' then
+				--Serious problems are caused if we start requesting data while in reset
 				cache_state <= IDLE after 100 ps;
+				req <= '0' after 100 ps;
+				cache_out.rden <= '0' after 100 ps;
+			else
+				if cache_state = IDLE then
+					req <= '0' after 100 ps;
+					cache_out.rden <= '0' after 100 ps;
+					WEB <= "0000" after 100 ps;
+					if cache_miss = '1' then
+						--16 instructions, 8 dwords
+						cache_reqaddr <= areg(IM_BITS-1 downto 4) & "0000" after 100 ps;
+						req <= '1' after 100 ps;
+						cache_out.len <= "000111" after 100 ps;
+						cache_state <= WAIT_FOR_DATA after 100 ps;
+						words <= "000";
+					end if;
+				elsif cache_state = WAIT_FOR_DATA then
+					req <= '0' after 100 ps;
+					if cache_in.empty = '0' then
+						cache_state <= TRANSFER_DATA after 100 ps;
+						cache_out.rden <= '1' after 100 ps;
+					end if;
+				elsif cache_state = TRANSFER_DATA then
+					--write the crap into the imem and tag ram
+					words <= std_logic_vector(unsigned(words)+1) after 100 ps;
+					cache_wraddr <= '0' & cache_reqaddr(8 downto 4) & words;
+					DIB <= cache_in.data after 100 ps;
+					cache_out.rden <= '1' after 100 ps;
+					WEB <= "1111" after 100 ps;
+					if cache_in.empty = '1' then
+						cache_out.rden <= '0' after 100 ps;
+						cache_state <= DELAY after 100 ps;
+						WEB <= "0000" after 100 ps;
+					end if;
+				else --if state = DELAY
+					--Delay an extra cycle to make sure the new tags propagate to the other side of the cache
+					cache_state <= IDLE after 100 ps;
+				end if;
 			end if;
 		end if;
 	end process;

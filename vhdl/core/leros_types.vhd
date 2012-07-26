@@ -69,6 +69,7 @@ package leros_types is
 		wraddr : std_logic_vector(IM_BITS-1 downto 0);
 		wrdata : std_logic_vector(15 downto 0);
 		wren : std_logic;
+		valid : std_logic;
 	end record;
 
 	type im_out_type is record
@@ -87,10 +88,23 @@ package leros_types is
 		data : std_logic_vector(31 downto 0);
 		empty : std_logic;
 	end record;
+	
+	type dm_cache_out_type is record
+		addr : std_logic_vector(IM_BITS downto 0);
+		len : std_logic_vector(5 downto 0);
+		req : std_logic;
+		rden : std_logic;
+	end record;
+	
+	type dm_cache_in_type is record
+		data : std_logic_vector(31 downto 0);
+		empty : std_logic;
+	end record;
 
 	type fedec_in_type is record
 		accu : std_logic_vector(31 downto 0);
 		dm_data : std_logic_vector(31 downto 0);
+		dmiss : std_logic;
 	end record;
 
 	type fedec_out_type is record
@@ -109,6 +123,7 @@ package leros_types is
 	type ex_out_type is record
 		accu : std_logic_vector(31 downto 0);
 		dm_data : std_logic_vector(31 downto 0);
+		dmiss : std_logic;
 	end record;
 	
 	type io_out_type is record

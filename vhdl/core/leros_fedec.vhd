@@ -53,7 +53,7 @@ architecture rtl of leros_fedec is
 	signal imin : im_in_type;
 	signal imout : im_out_type;
 	
-	signal zf, do_branch : std_logic;
+	signal zf, do_branch, all_valid : std_logic;
 	
 	signal pc, pc_next, pc_op, pc_add : unsigned(IM_BITS-1 downto 0);
 	signal decode : decode_type;
@@ -113,11 +113,11 @@ begin
 					do_branch <= '1' after 100 ps;
 				end if;
 			when "011" =>		-- brp
-				if din.accu(15)='0' then
+				if din.accu(31)='0' then
 					do_branch <= '1' after 100 ps;
 				end if;
 			when "100" =>		-- brn
-				if din.accu(15)='1' then
+				if din.accu(31)='1' then
 					do_branch <= '1' after 100 ps;
 				end if;
 			when others =>
@@ -143,7 +143,9 @@ begin
 	
 end process;
 
-dout.valid <= imout.valid;
+dout.valid <= all_valid;
+imin.valid <= all_valid;
+all_valid <= '1' when imout.valid = '1' and din.dmiss = '0' else '0';
 	
 -- pc register
 process(clk, reset)
@@ -151,7 +153,7 @@ begin
 	if reset='1' then
 		pc <= (others => '0') after 100 ps;
 	elsif rising_edge(clk) then
-		if imout.valid = '1' then --Stall pc
+		if all_valid = '1' then --Stall pc
 			pc <= pc_next after 100 ps;
 			dout.dec <= decode after 100 ps;
 	--		if decode.add_sub='1' then
@@ -167,7 +169,7 @@ begin
 			elsif decode.loadhh='1' then
 				dout.imm(23 downto 0) <= (others => '0') after 100 ps;
 				dout.imm(31 downto 24) <= imout.data(7 downto 0) after 100 ps;
-			else
+			else 
 				dout.imm <= std_logic_vector(resize(signed(imout.data(7 downto 0)), 32)) after 100 ps;
 			end if;
 		end if;

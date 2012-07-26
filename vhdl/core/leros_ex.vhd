@@ -59,7 +59,9 @@ entity leros_ex is
 		reset : in std_logic;
 		din : in fedec_out_type;
 		ioin : in io_in_type;
-		dout : out ex_out_type
+		dout : out ex_out_type;
+		dcache_in : in dm_cache_in_type;
+		dcache_out : out dm_cache_out_type
 	);
 end leros_ex;
 
@@ -177,7 +179,7 @@ begin
 end process;
 
 	dcache: entity work.leros_dcache port map(
-		clk, reset, din.valid, din.dec.store,wraddr,rdaddr,wraddr_indr,rdaddr_indr,wrdata,rddata
+		clk, reset, din.valid, din.dec.store,wraddr,rdaddr,wraddr_indr,rdaddr_indr,wrdata,rddata,dout.dmiss,dcache_in,dcache_out
 	);
 
 	

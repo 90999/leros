@@ -60,7 +60,13 @@ port (
 	icreq : out std_logic;
 	icrden : out std_logic;
 	icdata : in std_logic_vector(31 downto 0);
-	icempty : in std_logic
+	icempty : in std_logic;
+	dcaddr : out std_logic_vector(IM_BITS downto 0);
+	dclen : out std_logic_vector(5 downto 0);
+	dcreq : out std_logic;
+	dcrden : out std_logic;
+	dcdata : in std_logic_vector(31 downto 0);
+	dcempty : in std_logic
 );
 end leros_nexys2;
 
@@ -80,6 +86,9 @@ architecture rtl of leros_nexys2 is
 	
 	signal icache_in : im_cache_in_type;
 	signal icache_out : im_cache_out_type;
+	
+	signal dcache_in : dm_cache_in_type;
+	signal dcache_out : dm_cache_out_type;
 	
 begin
 
@@ -103,7 +112,7 @@ end process;
 
 
 	cpu: entity work.leros
-		port map(clk_int, int_res, ioout, ioin, icache_in, icache_out);
+		port map(clk_int, int_res, ioout, ioin, icache_in, icache_out, dcache_in, dcache_out);
 		
 	icaddr <= icache_out.addr;
 	iclen <= icache_out.len;
@@ -111,6 +120,13 @@ end process;
 	icrden <= icache_out.rden;
 	icache_in.data <= icdata;
 	icache_in.empty <= icempty;
+	
+	dcaddr <= dcache_out.addr;
+	dclen <= dcache_out.len;
+	dcreq <= dcache_out.req;
+	dcrden <= dcache_out.rden;
+	dcache_in.data <= dcdata;
+	dcache_in.empty <= dcempty;
 
 	ua: entity work.uart generic map (
 		clk_freq => 100000000,

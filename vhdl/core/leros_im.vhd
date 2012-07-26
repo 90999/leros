@@ -55,7 +55,7 @@ end leros_im;
 
 architecture rtl of leros_im is
 
-COMPONENT tag_mem 
+COMPONENT instr_mem 
   PORT (
     clka : IN STD_LOGIC;
     wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
@@ -70,6 +70,21 @@ COMPONENT tag_mem
   );
 END COMPONENT;
 
+COMPONENT tag_mem 
+  PORT (
+    clka : IN STD_LOGIC;
+    wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    addra : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
+    dina : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    douta : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+    clkb : IN STD_LOGIC;
+    web : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    addrb : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
+    dinb : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+    doutb : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+  );
+END COMPONENT;
+
 	type CACHE_STATE_T is (IDLE,WAIT_FOR_DATA,TRANSFER_DATA,DELAY);
 	signal cache_state : CACHE_STATE_T := IDLE;
 
@@ -78,7 +93,7 @@ END COMPONENT;
 	signal DOA				: std_logic_vector(15 downto 0);
 	signal DIB				: std_logic_vector(31 downto 0);
 	signal TAGO				: std_logic_vector(15 downto 0);
-	signal TAGI				: std_logic_vector(31 downto 0);
+	signal TAGI				: std_logic_vector(15 downto 0);
 	signal ADDRA   		: std_logic_vector(13 downto 0);
 	signal ADDRB 			: std_logic_vector(13 downto 0);
 	signal tag				: std_logic_vector(15 downto 0);
@@ -116,7 +131,7 @@ vccv <= "1111111111111111";
 	begin
 		if clk='1' and clk'Event then
 			--Otherwise we have trouble with the initial cache miss
-			if cache_miss = '0' or reset = '1' then
+			if din.valid = '1' or reset = '1' then
 				areg <= din.rdaddr after 100 ps;
 			end if;
 		end if;
@@ -124,7 +139,7 @@ vccv <= "1111111111111111";
 	
 	latched_addr <= din.rdaddr when cache_miss = '0' else areg after 100 ps;
 	
-  IRAM_INST : tag_mem
+  IRAM_INST : instr_mem
   PORT MAP (
     clka => clk,
     wea => gndv(0 downto 0),
@@ -143,7 +158,7 @@ vccv <= "1111111111111111";
   PORT MAP (
     clka => clk,
     wea => gndv(0 downto 0),
-    addra => latched_addr(9 downto 0),
+    addra => latched_addr(9 downto 1),
     dina => gndv(15 downto 0),
     douta => TAGO,
     clkb => clk,
@@ -156,7 +171,7 @@ vccv <= "1111111111111111";
 	--Memory subsystem uses byte addresses
 	cache_out.addr <= cache_reqaddr & "0";
 	
-	TAGI <= cache_reqaddr(25 downto 10) & cache_reqaddr(25 downto 10);
+	TAGI <= cache_reqaddr(25 downto 10);
 	
 	cache_out.req <= '0' when reset = '1' else req;
 	--Cache fill

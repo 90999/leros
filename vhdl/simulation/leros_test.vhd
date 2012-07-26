@@ -68,8 +68,7 @@ ARCHITECTURE behavior OF leros_test IS
 	-- the data ram
 	constant nwords : integer := 2 ** 13;
 	type ram_type is array(0 to nwords-1) of std_logic_vector(31 downto 0);
-	signal dm : ram_type;
-	signal dm2 : ram_type := (others => (others => '0'));
+	signal dm : ram_type := (others => (others => '0'));
 	
 
    --Inputs
@@ -181,11 +180,11 @@ BEGIN
 				end if;
 			else
 				if dcount <= dlen then
-						dcdata <= dm2(to_integer(unsigned(daddr)+unsigned(dcount))) after 100 ps;
+						dcdata <= dm(to_integer(unsigned(daddr)+unsigned(dcount))) after 100 ps;
 						dcempty <= '0' after 100 ps;
 					if dcrden='1' then
 						if dcount < dlen then
-							dcdata <= dm2(to_integer(unsigned(daddr)+unsigned(dcount)+1)) after 100 ps;
+							dcdata <= dm(to_integer(unsigned(daddr)+unsigned(dcount)+1)) after 100 ps;
 						else
 							dcempty <= '1' after 100 ps;
 							dstate <= WAIT_FOR_REQ after 100 ps;
@@ -218,7 +217,7 @@ BEGIN
    end process;
 
 dm(0) <= X"00000000";
-dm(1) <= X"29002100";
+dm(1) <= X"29042100";
 dm(2) <= X"21093001";
 dm(3) <= X"40000000";
 dm(4) <= X"00000000";

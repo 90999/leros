@@ -116,8 +116,8 @@ begin
 	--after the cycle that could clobber data
 
 
-	latched_rdaddr <= rdaddr when rdmiss='0' else rdaddrq after 100 ps;
-	latched_wraddr <= wraddr when wrmiss='0' else wraddrq after 100 ps;
+	latched_rdaddr <= rdaddr when valid = '1' else rdaddrq after 100 ps;
+	latched_wraddr <= wraddr when valid = '1' else wraddrq after 100 ps;
 	
 	rdmiss <= '1' when rdaddrq(24 downto 9) /= rdtago and rdindrq = '1' else '0' after 100 ps;
 	wrmiss <= '1' when wraddrq(24 downto 9) /= wrtago and wrindrq = '1' else '0' after 100 ps;
@@ -128,8 +128,7 @@ begin
 	process(clk)
 	begin
 		if clk='1' and clk'Event then
-		--TODO: why don't we stall this on icache miss?
-			if dmissint = '0' then
+			if valid = '1' then
 				rdaddrq <= rdaddr after 100 ps;
 				wraddrq <= wraddr after 100 ps;			
 				validq <= '1' after 100 ps;

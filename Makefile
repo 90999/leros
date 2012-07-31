@@ -15,16 +15,17 @@ USB=false
 # Assembler files
 APP=test
 APP=muvium
+APP=hello
 
 # Java application
-JAPP=Blink
+JAPP=DrawLine
 JAPP_PKG=.
 
 # Target Java compiler
 # muvium has issues with the current Oracle javac,
 # so we use jikes
-JAVAC_TARG=jikes/jikes
-# JAVAC_TARG=javac
+#JAVAC_TARG=jikes/jikes
+JAVAC_TARG=javac
 
 # Altera FPGA configuration cable
 #BLASTER_TYPE=ByteBlasterMV
@@ -75,7 +76,7 @@ tools:
 		-d java/tools/classes java/tools/src/leros/asm/generated/*.java \
 		java/tools/src/leros/asm/*.java
 	javac -d java/tools/classes -sourcepath \
-		java/tools/src java/tools/src/leros/sim/*.java
+		java/tools/src java/tools/src/leros/sim/*.java java/tools/src/leros/disasm/*.java
 	cd java/tools/classes && jar cf ../lib/leros-tools.jar *
 
 java_app:
@@ -101,6 +102,10 @@ rom:
 jsim: rom
 	java -cp java/tools/lib/leros-tools.jar -Dlog=false \
 		leros.sim.LerosSim rom.txt
+
+jdis: rom
+	java -cp java/tools/lib/leros-tools.jar -Dlog=false \
+		leros.disasm.LerosDis rom.txt symbols.txt
 sim: rom
 	cd modelsim; make
 

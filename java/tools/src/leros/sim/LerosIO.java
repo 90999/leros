@@ -41,9 +41,9 @@ package leros.sim;
  */
 public class LerosIO implements ILerosIO{
 
-    final static int UART_STATUS = 2;
-    final static int UART_IO = 3;
-    final static int LED = 0;
+    final static int UART_STATUS = 0;
+    final static int UART_IO = 1;
+    final static int LED = 2;
     
     int[] command = new int[]{ 10,10,30,20,1,1};
     int commandIndex = 0;
@@ -53,7 +53,7 @@ public class LerosIO implements ILerosIO{
  
         case UART_IO:
           
-            System.out.println((char) data);
+            System.out.print((char) data);
            
             break;
             
@@ -61,7 +61,7 @@ public class LerosIO implements ILerosIO{
             System.out.println( "LED = " + String.valueOf(data) );
             break;
         default:
-            System.out.println("IO address " + addr + " not defined");
+            System.out.println("IO address " + addr + " not defined data: " + data);
             break;
         }
     }

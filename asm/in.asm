@@ -18,7 +18,7 @@
 
 start:
 	load 0
-	loadh	0 //4kb
+	loadh	4 //4kb
 	store r1 //Stack pointer
 	load <main
 	nop
@@ -29,9 +29,9 @@ main:
 	FUNCTION_ENTER(r3)
 	
 	load 76
-	loadh 1
-	loadhl 2
-	loadhh 3
+	loadh 0
+	loadhl 0
+	loadhh 0
 	store r3
 	FUNCTION_CALL(send)
 
@@ -65,21 +65,61 @@ main:
 	store r3
 	FUNCTION_CALL(send)
 
-	FUNCTION_CALL(foo_func)
-	FUNCTION_CALL(foo_func2)
-	FUNCTION_CALL(foo_func3)
-	FUNCTION_CALL(foo_func4)
 
-	load 10
-	store r3
-	FUNCTION_CALL(fibonacci)
+	FUNCTION_CALL(foo_func)
 
 	load 117
 	store r3
 	FUNCTION_CALL(send)
 
+
+	FUNCTION_CALL(foo_func2)
+
+	load 118
+	store r3
+	FUNCTION_CALL(send)
+
+	FUNCTION_CALL(foo_func3)
+
+	load 119
+	store r3
+	FUNCTION_CALL(send)
+
+
+	FUNCTION_CALL(foo_func4)
+
+	load 120
+	store r3
+	FUNCTION_CALL(send)
+
+	load 10
+	store r3
+	FUNCTION_CALL(fibonacci)
+
 	load r2
 	out 0
+
+	load 121
+	store r3
+	FUNCTION_CALL(send)
+
+	FUNCTION_CALL(mem_test)
+
+	load 122
+	store r3
+	FUNCTION_CALL(send)
+
+	FUNCTION_CALL(mem_test2)
+//	FUNCTION_CALL(mem_write)
+
+	load 123
+	store r3
+	FUNCTION_CALL(send)
+
+
+	load r2
+	out 0
+
 
 end:
 	branch end
@@ -87,13 +127,16 @@ end:
 
 	FUNCTION_END(r3)
 
+	nop
+	nop
+
 //foo_func5:
 //	FUNCTION_ENTER(r3)
-//	FUNCTION_END(r3)
+//	FUNCTION_END(r3,r4)
 
 foo_func:
-	FUNCTION_ENTER(r2,r3,r4,r5,r6,r7,r8,r9,r10)
-	FUNCTION_END(r2,r3,r4,r5,r6,r7,r8,r9,r10)
+	FUNCTION_ENTER(r2,r3,r4,r5,r6,r7,r8)
+	FUNCTION_END(r2,r3,r4,r5,r6,r7,r8)
 
 foo_func2:
 	FUNCTION_ENTER(r2,r3,r4,r5,r6,r7,r8,r9,r10)
@@ -208,3 +251,158 @@ fib_ret:
 	store r2
 	FUNCTION_END(r3,r4)
 
+mem_write_line:
+	FUNCTION_ENTER(r3,r4)
+
+	load 0
+	add r4
+	loadaddr r3
+	store(ar+0)
+
+	load 1
+	add r4
+	loadaddr r3
+	store(ar+1)
+
+	load 2
+	add r4
+	loadaddr r3
+	store(ar+2)
+
+	load 3
+	add r4
+	loadaddr r3
+	store(ar+3)
+
+	load 4
+	add r4
+	loadaddr r3
+	store(ar+4)
+
+	load 5
+	add r4
+	loadaddr r3
+	store(ar+5)
+
+	load 6
+	add r4
+	loadaddr r3
+	store(ar+6)
+
+	load 7
+	add r4
+	loadaddr r3
+	store(ar+7)
+
+	FUNCTION_END(r3,r4)
+
+mem_test:
+	FUNCTION_ENTER(r3,r4)
+
+	load 128
+	loadh	4
+	loadhl 0
+	loadhh 0
+	store r3 
+	load 0
+	store r4
+
+	FUNCTION_CALL(mem_write_line)
+	
+	load r3
+	loadh 6
+	store r3
+	
+	load 20
+	store r4
+
+	FUNCTION_CALL(mem_write_line)
+
+	FUNCTION_END(r3,r4)
+
+mem_write:
+	FUNCTION_ENTER(r3,r4)
+	
+	//r3 is count
+	//r4 is base
+	load 0
+	loadh 4
+	store r3
+	load 0	
+	loadh 5
+	store r4
+
+loop:
+	load r3
+	loadaddr r4
+	store(ar+0)
+
+	load r4
+	add 1
+	store r4
+
+	load r3
+	sub 1
+	store r3
+	nop
+
+	brnz loop
+	nop
+
+	FUNCTION_END(r3,r4)
+
+mem_test2:
+	FUNCTION_ENTER(r3,r4,r5)
+
+	FUNCTION_CALL(mem_write)
+
+	//Checksum
+	//r3 is count
+	//r4 is base
+	//r5 is sum
+	load 0 //6 fails
+	loadh 4
+	loadhl 0
+	loadhh 0
+	store r3
+	load 0	
+	loadh 5
+	store r4
+	load 0
+	store r5
+
+//	load 2
+//	loadh 8
+//	loadhl 0
+//	loadhh 0
+//	store r4
+//	nop
+//	loadaddr r4
+//	load (ar+0)
+//	store r5
+//	nop
+//	branch sum_done
+
+loop2:
+	loadaddr r4
+	load(ar+0)
+
+	xor r5
+	store r5
+
+	load r4
+	add 1
+	store r4
+
+	load r3
+	sub 1
+	store r3
+	nop
+
+	brnz loop2
+
+sum_done:
+	load r5
+	store r2
+
+	FUNCTION_END(r3,r4,r5)

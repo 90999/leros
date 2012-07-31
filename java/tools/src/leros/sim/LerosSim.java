@@ -50,8 +50,8 @@ public class LerosSim {
 
 	ILerosIO io;
 
-	final static int IM_SIZE = 1024;
-	final static int DM_SIZE = 1024;
+	final static int IM_SIZE = 1024*16;
+	final static int DM_SIZE = 1024*16;
 	char im[] = new char[IM_SIZE];
 	char dm[] = new char[DM_SIZE];
 	int progSize = 0;
@@ -152,8 +152,8 @@ public class LerosSim {
 			if ((instr & 0x0100) != 0) {
 				// take o bit from the instruction
 				val = instr & 0xff;
-				// sign extension to 16 bit
-				if ((val & 0x80)!=0) { val |= 0xff00; }
+				// sign extension to 32 bit
+				if ((val & 0x80)!=0) { val |= 0xffffff00; }
 			} else {
 				val = dm[instr & 0xff];
 			}
@@ -184,8 +184,14 @@ public class LerosSim {
 				accu ^= val;
 				break;
 			case 0x2800: // loadh
-				accu = (accu & 0xff) + (val << 8);
+				accu = (accu & 0xffff00ff) + (val << 8);
 				break;
+			case 0x2C00: //loadhl
+				accu = (accu & 0xff00ffff) + (val << 16);
+				break;
+			case 0x2E00: //loadhh
+				accu = (accu & 0x00ffffff) + (val << 24);
+				break;	
 			case 0x3000: // store
 				dm[instr & 0x00ff] = (char) accu;
 				break;
@@ -257,7 +263,7 @@ public class LerosSim {
 	    
 
 			// keep it in 16 bit
-			accu &= 0xffff;
+			//accu &= 0xffff;
 			// the address register is only available for one
 			// cycle later
 			ar = dm[instr & 0xff];

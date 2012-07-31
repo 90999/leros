@@ -91,6 +91,12 @@ pass2 returns [List mem]
 	}
 	}; 
 
+// Don't know how to return a simple int array :-(
+getsymbols returns [List mem]
+	:{
+	$mem = new ArrayList(symbols.entrySet());
+	};
+
 statement: (label)? (directive | instruction)? (COMMENT)? NEWLINE;
 
 label:  ID ':' {symbols.put($ID.text, new Integer(pc));};

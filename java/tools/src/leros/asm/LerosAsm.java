@@ -216,12 +216,20 @@ public class LerosAsm {
 		parser.pass1();
 		// parser.dump();
 		parser.reset();
+		List symbols = parser.getsymbols();
 		List code = parser.pass2();
 
 		System.out.println("foo");		
 	//	System.out.println(code);
 
 		la.dump(code);
+
+		PrintWriter symdat = new PrintWriter(new FileWriter("symbols.txt"));
+		Object o[] = symbols.toArray();
+		for (int i = 0; i < o.length; ++i) {
+			symdat.println(o[i]);
+		}
+		symdat.close();
 	}
 
 }

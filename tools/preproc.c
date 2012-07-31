@@ -173,7 +173,6 @@ int main()
 					fprintf(outfile,"//Restoring register %d\n", i);
 					fprintf(outfile,"loadaddr r1\n");
 					fprintf(outfile,"load (ar+%d)\n",nregs);
-					fprintf(outfile,"nop\n");
 					nregs--;
 					fprintf(outfile,"store r%d\n",i);
 				}
@@ -182,7 +181,6 @@ int main()
 			fprintf(outfile,"//Restoring link register\n");
 			fprintf(outfile,"loadaddr r1\n");
 			fprintf(outfile,"load (ar+0)\n");	
-			fprintf(outfile,"nop\n");	
 			fprintf(outfile,"store r0\n");
 			fprintf(outfile,"jal r0\n");
 			fprintf(outfile,"nop\n");

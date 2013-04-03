@@ -59,40 +59,41 @@ entity leros_ex is
 		reset : in std_logic;
 		din : in fedec_out_type;
 		ioin : in io_in_type;
-		dout : out ex_out_type
+		dout : out ex_out_type;
+		dcache_in : in dm_cache_in_type;
+		dcache_out : out dm_cache_out_type
 	);
 end leros_ex;
 
 architecture rtl of leros_ex is
 
 	-- the accu
-	signal accu, opd  : unsigned(15 downto 0);
-	signal log, arith, a_mux : unsigned (15 downto 0);
+	signal accu, opd  : unsigned(31 downto 0);
+	signal log, arith, a_mux : unsigned (31 downto 0);
 	
-	-- the data ram
-	constant nwords : integer := 2 ** DM_BITS;
-	type ram_type is array(0 to nwords-1) of std_logic_vector(15 downto 0);
-
-	-- 0 initialization is for simulation only
-	-- Xilinx and Altera FPGA initialize memory blocks to 0
-	signal dm : ram_type := (others => (others => '0'));
-	
-	signal wrdata, rddata : std_logic_vector(15 downto 0);
+	signal wrdata, rddata : std_logic_vector(31 downto 0);
 	signal wraddr, rdaddr : std_logic_vector(DM_BITS-1 downto 0);
 	
 	signal wraddr_dly : std_logic_vector(DM_BITS-1 downto 0);
 	signal pc_dly : std_logic_vector(IM_BITS-1 downto 0);
 	
-
+	signal rdaddr_indr, wraddr_indr : std_logic;
+	signal zf : std_logic;
+	
 begin
 
 	dout.accu <= std_logic_vector(accu) after 100 ps;
 	dout.dm_data <= rddata after 100 ps;
+	dout.zf <= zf after 100 ps;
 	rdaddr <= din.dm_addr after 100 ps;
+	
+	--TODO: pretty sure this is all wrong. dec is cycle delayed decode
+	rdaddr_indr <= din.decode.indls and not din.decode.store after 100 ps;
 	-- address for the write needs one cycle delay
 	wraddr <= wraddr_dly after 100 ps;
+	wraddr_indr <= din.dec.indls and din.dec.store  after 100 ps;
 	
-	
+--todo add high word	
 process(din, rddata)
 begin
 	if din.dec.sel_imm='1' then
@@ -112,22 +113,19 @@ begin
 		arith <= accu - opd after 100 ps;
 	end if;
 
-	case din.dec.op is
-		when op_ld =>
+	if din.dec.op = op_ld or din.dec.loadhl = '1' or din.dec.loadhh = '1' then
 			log <= opd after 100 ps;
-		when op_and =>
+	elsif din.dec.op = op_and then
 			log <= accu and opd after 100 ps;
-		when op_or =>
+	elsif din.dec.op = op_or then
 			log <= accu or opd after 100 ps;
-		when op_xor =>
+	else
 			log <= accu xor opd after 100 ps;
-		when others =>
-			null;
-	end case;
+	end if;
 	
 	if din.dec.log_add='0' then
 		if din.dec.shr='1' then
-			a_mux <= '0' & accu(15 downto 1) after 100 ps;
+			a_mux <= '0' & accu(31 downto 1) after 100 ps;
 		else
 			if din.dec.inp='1' then
 				a_mux <= unsigned(ioin.rddata) after 100 ps;
@@ -146,7 +144,7 @@ process(din, accu, pc_dly)
 begin
 	if din.dec.jal='1' then
 		wrdata(IM_BITS-1 downto 0) <= pc_dly after 100 ps;
-		wrdata(15 downto IM_BITS) <= (others => '0') after 100 ps;
+		wrdata(31 downto IM_BITS) <= (others => '0') after 100 ps;
 	else
 		wrdata <= std_logic_vector(accu) after 100 ps;
 	end if;
@@ -159,36 +157,37 @@ begin
 		accu <= (others => '0');
 --		dout.outp <= (others => '0');
 	elsif rising_edge(clk) then
-		if din.dec.al_ena = '1' then
-			accu(7 downto 0) <= a_mux(7 downto 0) after 100 ps;
+		if din.valid = '1' then
+			if din.dec.al_ena = '1' then
+				accu(7 downto 0) <= a_mux(7 downto 0) after 100 ps;
+			end if;
+			if din.dec.ah_ena = '1' then
+				accu(15 downto 8) <= a_mux(15 downto 8) after 100 ps;
+			end if;
+			if din.dec.ahl_ena = '1' then
+				accu(23 downto 16) <= a_mux(23 downto 16) after 100 ps;
+			end if;
+			if din.dec.ahh_ena = '1' then
+				accu(31 downto 24) <= a_mux(31 downto 24) after 100 ps;
+			end if;
+			wraddr_dly <= din.dm_addr after 100 ps;
+			pc_dly <= din.pc after 100 ps;
+			if unsigned(a_mux(15 downto 0)) = 0 then
+				zf <= '1' after 100 ps;
+			else
+				zf <= '0' after 100 ps;
+			end if;
+				-- a simple output port for the hello world example
+	--		if din.dec.outp='1' then
+	--			dout.outp <= std_logic_vector(accu);
+	--		end if;
 		end if;
-		if din.dec.ah_ena = '1' then
-			accu(15 downto 8) <= a_mux(15 downto 8) after 100 ps;
-		end if;
-		wraddr_dly <= din.dm_addr after 100 ps;
-		pc_dly <= din.pc after 100 ps;
-		-- a simple output port for the hello world example
---		if din.dec.outp='1' then
---			dout.outp <= std_logic_vector(accu);
---		end if;
 	end if;
 end process;
 
--- the data memory (DM)
--- read during write is usually undefined in an FPGA,
--- but that is not modelled
-process (clk)
-begin
-	if rising_edge(clk) then
-		-- is store overloaded?
-		-- now we have only 'register' read and write
-		if din.dec.store='1' then
-			dm(to_integer(unsigned(wraddr))) <= wrdata after 100 ps;
-		end if;
-		rddata <= dm(to_integer(unsigned(rdaddr))) after 100 ps;
-		
-	end if;
-end process;
+	dcache: entity work.leros_dcache port map(
+		clk, reset, din.valid, din.dec.store,wraddr,rdaddr,wraddr_indr,rdaddr_indr,wrdata,rddata,dout.dmiss,dcache_in,dcache_out
+	);
 
 	
 end rtl;

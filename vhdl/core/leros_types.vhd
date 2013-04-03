@@ -36,8 +36,8 @@ use ieee.numeric_std.all;
 package leros_types is
 
 	-- should this later go to a lerso_config package?
-	constant DM_BITS : integer := 8;
-	constant IM_BITS : integer := 10;
+	constant DM_BITS : integer := 26;
+	constant IM_BITS : integer := 26;
 
 	type alu_log_type is (op_and, op_or, op_xor, op_ld);
 	
@@ -45,6 +45,8 @@ package leros_types is
 		op : alu_log_type;
 		al_ena : std_logic;
 		ah_ena : std_logic;
+		ahl_ena : std_logic;
+		ahh_ena : std_logic;
 		log_add : std_logic;
 		add_sub : std_logic;
 		shr : std_logic;
@@ -57,29 +59,67 @@ package leros_types is
 		br_op : std_logic;
 		jal : std_logic;
 		loadh : std_logic;
+		loadhl : std_logic;
+		loadhh : std_logic;
+		load_addr : std_logic;
 	end record;
 
 	type im_in_type is record
 		rdaddr : std_logic_vector(IM_BITS-1 downto 0);
+		pc : std_logic_vector(IM_BITS-1 downto 0);
 		wraddr : std_logic_vector(IM_BITS-1 downto 0);
 		wrdata : std_logic_vector(15 downto 0);
 		wren : std_logic;
+		valid : std_logic;
 	end record;
 
 	type im_out_type is record
 		data : std_logic_vector(15 downto 0);
+		valid : std_logic;
+	end record;
+	
+	type im_cache_out_type is record
+		addr : std_logic_vector(IM_BITS downto 0);
+		len : std_logic_vector(5 downto 0);
+		req : std_logic;
+		rden : std_logic;
+	end record;
+	
+	type im_cache_in_type is record
+		data : std_logic_vector(31 downto 0);
+		empty : std_logic;
+	end record;
+	
+	type dm_cache_out_type is record
+		addr : std_logic_vector(IM_BITS downto 0);
+		len : std_logic_vector(5 downto 0);
+		req : std_logic;
+		req_write : std_logic;
+		rden : std_logic;
+		wren : std_logic;
+		data : std_logic_vector(31 downto 0);
+	end record;
+	
+	type dm_cache_in_type is record
+		data : std_logic_vector(31 downto 0);
+		empty : std_logic;
+		ack : std_logic;
 	end record;
 
 	type fedec_in_type is record
-		accu : std_logic_vector(15 downto 0);
-		dm_data : std_logic_vector(15 downto 0);
+		accu : std_logic_vector(31 downto 0);
+		dm_data : std_logic_vector(31 downto 0);
+		dmiss : std_logic;
+		zf : std_logic;
 	end record;
 
 	type fedec_out_type is record
 		dec : decode_type;
-		imm : std_logic_vector(15 downto 0);
+		decode : decode_type;
+		imm : std_logic_vector(31 downto 0);
 		dm_addr : std_logic_vector(DM_BITS-1 downto 0);
 		pc : std_logic_vector(IM_BITS-1 downto 0);
+		valid : std_logic;
 	end record;
 
 -- 	type ex_in_type is record
@@ -88,19 +128,21 @@ package leros_types is
 -- 	end record;
 
 	type ex_out_type is record
-		accu : std_logic_vector(15 downto 0);
-		dm_data : std_logic_vector(15 downto 0);
+		accu : std_logic_vector(31 downto 0);
+		dm_data : std_logic_vector(31 downto 0);
+		dmiss : std_logic;
+		zf : std_logic;
 	end record;
 	
 	type io_out_type is record
 		addr : std_logic_vector(7 downto 0);
 		rd : std_logic;
 		wr : std_logic;
-		wrdata : std_logic_vector(15 downto 0);
+		wrdata : std_logic_vector(31 downto 0);
 	end record;
 
 	type io_in_type is record
-		rddata : std_logic_vector(15 downto 0);
+		rddata : std_logic_vector(31 downto 0);
 	end record;
 	
 

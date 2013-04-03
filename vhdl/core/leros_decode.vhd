@@ -54,6 +54,8 @@ begin
 	dec.op <= op_ld after 100 ps;
 	dec.al_ena <= '0' after 100 ps;
 	dec.ah_ena <= '0' after 100 ps;
+	dec.ahl_ena <= '0' after 100 ps;
+	dec.ahh_ena <= '0' after 100 ps;
 	dec.log_add <= '0' after 100 ps;
 	dec.add_sub <= '0' after 100 ps;
 	dec.shr <= '0' after 100 ps;
@@ -65,7 +67,10 @@ begin
 	dec.br_op <= '0' after 100 ps;
 	dec.jal <= '0' after 100 ps;
 	dec.loadh <= '0' after 100 ps;
+	dec.loadhl <= '0' after 100 ps;
+	dec.loadhh <= '0' after 100 ps;
 	dec.indls<= '0' after 100 ps;	
+	dec.load_addr <= '0' after 100 ps;
 	
 	-- start decoding
 	dec.add_sub <= instr(2) after 100 ps;
@@ -76,19 +81,33 @@ begin
 		when "00001" =>		-- add, sub
 			dec.al_ena <= '1' after 100 ps;
 			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
 			dec.log_add <= '1' after 100 ps;
 		when "00010" =>		-- shr
 			dec.al_ena <= '1' after 100 ps;
 			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
 			dec.shr <= '1' after 100 ps;
 		when "00011" =>		-- reserved
 			null;
 		when "00100" =>		-- alu
 			dec.al_ena <= '1' after 100 ps;
 			dec.ah_ena <= '1' after 100 ps;
-		when "00101" =>		-- loadh
-			dec.loadh <= '1' after 100 ps;
-			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
+		when "00101" =>		-- loadh*
+			if instr(2 downto 1) = "11" then
+				dec.loadhh <= '1' after 100 ps;
+				dec.ahh_ena <= '1' after 100 ps;
+			elsif instr(2 downto 1) = "10" then
+				dec.loadhl <= '1' after 100 ps;
+				dec.ahl_ena <= '1' after 100 ps;	
+			else
+				dec.loadh <= '1' after 100 ps;
+				dec.ah_ena <= '1' after 100 ps;
+			end if;
 		when "00110" =>		-- store
 			dec.store <= '1' after 100 ps;
 		when "00111" =>		-- I/O
@@ -97,6 +116,8 @@ begin
 			else
 				dec.al_ena <= '1' after 100 ps;
 				dec.ah_ena <= '1' after 100 ps;
+				dec.ahl_ena <= '1' after 100 ps;
+				dec.ahh_ena <= '1' after 100 ps;
 				dec.inp <= '1' after 100 ps;
 			end if;
 		when "01000" =>		-- jal
@@ -105,10 +126,12 @@ begin
 		when "01001" =>		-- branch
 			dec.br_op <= '1' after 100 ps;
 		when "01010" =>		-- loadaddr
-			null;
+			dec.load_addr <= '1' after 100 ps;
 		when "01100" =>		-- load indirect
 			dec.al_ena <= '1' after 100 ps;
 			dec.ah_ena <= '1' after 100 ps;
+			dec.ahl_ena <= '1' after 100 ps;
+			dec.ahh_ena <= '1' after 100 ps;
 			dec.indls <= '1' after 100 ps;
 		when "01110" =>		-- store indirect
 			dec.indls <= '1' after 100 ps;

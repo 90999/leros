@@ -42,7 +42,9 @@ entity leros_fedec is
 		clk : in std_logic;
 		reset : in std_logic;
 		din : in fedec_in_type;
-		dout : out fedec_out_type
+		dout : out fedec_out_type;
+		icache_in : in im_cache_in_type;
+		icache_out : out im_cache_out_type
 	);
 end leros_fedec;
 
@@ -51,36 +53,56 @@ architecture rtl of leros_fedec is
 	signal imin : im_in_type;
 	signal imout : im_out_type;
 	
-	signal zf, do_branch : std_logic;
+	signal zf, do_branch, all_valid : std_logic;
 	
 	signal pc, pc_next, pc_op, pc_add : unsigned(IM_BITS-1 downto 0);
 	signal decode : decode_type;
+	
+	signal addr_save : std_logic_vector(31 downto 0);
+	signal addr_mux : std_logic_vector(31 downto 0);
 
+	signal load_addr_q : std_logic;
 begin
 
 	dout.pc <= std_logic_vector(pc_add);
 	
 	imin.rdaddr <= std_logic_vector(pc_next);
+	imin.pc <= std_logic_vector(pc);
 	
 	im: entity work.leros_im port map(
-		clk, reset, imin, imout
+		clk, reset, imin, imout, icache_in, icache_out
 	);
 
 	dec: entity work.leros_decode port map(
 		imout.data(15 downto 8), decode
 	);
 	
--- DM address selection
-process(decode, din, imout)
-	variable addr : std_logic_vector(15 downto 0);
+process(clk)
 begin
-	addr := std_logic_vector(unsigned(din.dm_data) + unsigned(imout.data(7 downto 0)));
+	if clk = '1' and clk'Event then
+		if all_valid = '1' then
+			load_addr_q <= decode.load_addr after 100 ps;
+			if load_addr_q = '1' then
+				addr_save <= din.dm_data after 100 ps;
+			end if;
+		end if;
+	end if;
+end process;
+
+addr_mux <= din.dm_data when load_addr_q = '1' else
+					addr_save after 100 ps;
+	
+-- DM address selection
+process(decode, din, imout, addr_mux)
+	variable addr : std_logic_vector(31 downto 0);
+begin
+	addr := std_logic_vector(unsigned(addr_mux) + unsigned(imout.data(7 downto 0)));
 	-- MUX for indirect load/store (from unregistered decode)
 	if decode.indls='1' then
 		dout.dm_addr <= addr(DM_BITS-1 downto 0) after 100 ps;
 	else
 		-- If DM > 256 zero extend the varidx
-		dout.dm_addr <= imout.data(DM_BITS-1 downto 0) after 100 ps;
+		dout.dm_addr <= std_logic_vector(resize(unsigned(imout.data(7 downto 0)), DM_BITS)) after 100 ps;
 	end if;
 
 end process;
@@ -89,7 +111,7 @@ end process;
 process(decode, din, do_branch, imout, pc, pc_add, pc_op, zf)
 begin
 	-- should be checked in ModelSim
-	if unsigned(din.accu)=0 then
+  	if unsigned(din.accu)=0 then
 		zf <= '1' after 100 ps;
 	else
 		zf <= '0' after 100 ps;
@@ -110,11 +132,11 @@ begin
 					do_branch <= '1' after 100 ps;
 				end if;
 			when "011" =>		-- brp
-				if din.accu(15)='0' then
+				if din.accu(31)='0' then
 					do_branch <= '1' after 100 ps;
 				end if;
 			when "100" =>		-- brn
-				if din.accu(15)='1' then
+				if din.accu(31)='1' then
 					do_branch <= '1' after 100 ps;
 				end if;
 			when others =>
@@ -139,6 +161,11 @@ begin
 	end if;
 	
 end process;
+
+dout.valid <= all_valid;
+imin.valid <= all_valid;
+all_valid <= '1' when imout.valid = '1' and din.dmiss = '0' else '0';
+dout.decode <= decode;
 	
 -- pc register
 process(clk, reset)
@@ -146,15 +173,25 @@ begin
 	if reset='1' then
 		pc <= (others => '0') after 100 ps;
 	elsif rising_edge(clk) then
-		pc <= pc_next after 100 ps;
-		dout.dec <= decode after 100 ps;
---		if decode.add_sub='1' then
-		-- sign extension depends on loadh?????
-		if decode.loadh='1' then
-			dout.imm(7 downto 0) <= (others => '0') after 100 ps;
-			dout.imm(15 downto 8) <= imout.data(7 downto 0) after 100 ps;
-		else
-			dout.imm <= std_logic_vector(resize(signed(imout.data(7 downto 0)), 16)) after 100 ps;
+		if all_valid = '1' then --Stall pc
+			pc <= pc_next after 100 ps;
+			dout.dec <= decode after 100 ps;
+	--		if decode.add_sub='1' then
+			-- sign extension depends on loadh?????
+			if decode.loadh='1' then
+				dout.imm(7 downto 0) <= (others => '0') after 100 ps;
+				dout.imm(15 downto 8) <= imout.data(7 downto 0) after 100 ps;
+				dout.imm(31 downto 16) <= (others => '0') after 100 ps;
+			elsif	decode.loadhl='1' then
+				dout.imm(15 downto 0) <= (others => '0') after 100 ps;
+				dout.imm(23 downto 16) <= imout.data(7 downto 0) after 100 ps;
+				dout.imm(31 downto 24) <= (others => '0') after 100 ps;
+			elsif decode.loadhh='1' then
+				dout.imm(23 downto 0) <= (others => '0') after 100 ps;
+				dout.imm(31 downto 24) <= imout.data(7 downto 0) after 100 ps;
+			else 
+				dout.imm <= std_logic_vector(resize(signed(imout.data(7 downto 0)), 32)) after 100 ps;
+			end if;
 		end if;
 --		else
 --			immr(7 downto 0) <= imout.data(7 downto 0);

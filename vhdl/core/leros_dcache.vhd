@@ -111,12 +111,12 @@ COMPONENT ditry_ram
   );
 END COMPONENT;
 
-	type CACHE_STATE_T is (IDLE,CHECK_DIRTY,WAIT_FOR_ACK,WAIT_FOR_DATA,TRANSFER_DATA,TRANSFER_RD_DATA,DELAY);
+	type CACHE_STATE_T is (IDLE,CHECK_DIRTY,WAIT_FOR_ACK,WAIT_FOR_DATA,TRANSFER_DATA,TRANSFER_RD_DATA,DELAY,DELAY2);
 	signal cache_state : CACHE_STATE_T := IDLE;
 
 	signal mem_wraddr, mem_rdaddr, cache_wraddr, dmem_wraddr, tag_wraddr : std_logic_vector(8 downto 0);
 	signal reg_we, cache_we, tag_we : std_logic_vector(3 downto 0);
-	signal rddata_cache, rddata_reg, dmem_wrdata, cache_din, wrdataq : std_logic_vector(31 downto 0);
+	signal rddata_cache, rddata_reg, dmem_wrdata, cache_din, wrdataq, latched_wrdata : std_logic_vector(31 downto 0);
 	signal gndv,vccv : std_logic_vector(31 downto 0);
 	signal rdaddrq,wraddrq : std_logic_vector(DM_BITS-1 downto 0);
 	signal latched_rdaddr,latched_wraddr : std_logic_vector(DM_BITS-1 downto 0);
@@ -134,6 +134,7 @@ END COMPONENT;
 	signal rdindrq, wrindrq, storeq : std_logic;
 	signal stall : std_logic;
 	signal cache_dout : std_logic_vector(31 downto 0);
+	signal was_rdmiss : std_logic;
 
 begin
 
@@ -148,6 +149,7 @@ begin
 
 	latched_rdaddr <= rdaddr when valid = '1' else rdaddrq after 100 ps;
 	latched_wraddr <= wraddr when valid = '1' else wraddrq after 100 ps;
+	latched_wrdata <= wrdata when valid = '1' else wrdataq after 100 ps;
 	
 	rdmiss <= '1' when rdaddrq(24 downto 9) /= rdtago and rdindrq = '1' else '0' after 100 ps;
 	wrmiss <= '1' when wraddrq(24 downto 9) /= wrtago and wrindrq = '1' else '0' after 100 ps;
@@ -179,9 +181,9 @@ begin
 	
 	dmem_wrdata <= cache_din when cache_sel = '1' else wrdataq;
 	
-
-	reg_we <= "1111" when (store = '1' and wrindr = '0' and valid='1') or
-								 (valid = '0' and storeq = '1' and wrindrq = '0') 
+	--TODO: maybe the commented out line works if we attach reg-ram to latched_wraddr and data?
+	reg_we <= "1111" when (store = '1' and wrindr = '0' and valid='1') 
+								--or (valid = '0' and storeq = '1' and wrindrq = '0') 
 								 else "0000" after 100 ps;
 								 
 	cache_we <= "1111" when (storeq = '1' and wrindrq = '1' and valid='1') or cache_write = '1' else "0000" after 100 ps;
@@ -196,7 +198,7 @@ begin
     clka => clk,
     wea => reg_we(0 downto 0),
     addra => mem_wraddr(7 downto 0),
-    dina => wrdata,
+    dina => wrdata, --latched_wrdata,
     clkb => clk,
     addrb => mem_rdaddr(7 downto 0),
     doutb => rddata_reg
@@ -284,9 +286,11 @@ begin
 					--TODO: flush the line if its dirty
 					if rdmiss = '1' then
 						--8 dwords
+						was_rdmiss <= '1' after 100 ps;
 						cache_reqaddr <= rdaddrq(IM_BITS-2 downto 3) & "000" after 100 ps;
 						cache_oldaddr <= rdtago & rdaddrq(8 downto 3) & "000" after 100 ps;
 					elsif wrmiss = '1' then
+						was_rdmiss <= '0' after 100 ps;
 						cache_reqaddr <= wraddrq(IM_BITS-2 downto 3) & "000" after 100 ps;
 						cache_oldaddr <= wrtago & wraddrq(8 downto 3) & "000" after 100 ps;
 					end if;
@@ -316,17 +320,23 @@ begin
 						cache_state <= TRANSFER_RD_DATA after 100 ps;
 					end if;
 				elsif cache_state = TRANSFER_RD_DATA then
-					cache_out.wren <= '1' after 100 ps;
+					if words = "0010" then
+						cache_out.wren <= '1' after 100 ps;
+					end if;
+					cache_out.req_write <= '0' after 100 ps;
 					words <= std_logic_vector(unsigned(words)+1) after 100 ps;
-					cache_wraddr <= cache_reqaddr(8 downto 3) & std_logic_vector(unsigned(words(2 downto 0))+1) after 100 ps;
+					cache_wraddr <= cache_reqaddr(8 downto 3) & words(2 downto 0) after 100 ps;
 					cache_out.data <= cache_dout after 100 ps;
-					if words = "1000" then
+					if words = "1010" then
 						cache_out.wren <= '0' after 100 ps;
 						dirty_clear <= '1' after 100 ps;
 						--TODO: we can speeed things up a little by not doing the
 						--dirty check and stuff again
-						cache_state <= IDLE after 100 ps;
+						cache_state <= DELAY2 after 100 ps;
 					end if;
+				elsif cache_state = DELAY2 then
+					dirty_clear <= '0' after 100 ps;
+					cache_state <= IDLE after 100 ps;
 				elsif cache_state = WAIT_FOR_DATA then
 					req <= '0' after 100 ps;
 					if cache_in.empty = '0' then
@@ -348,7 +358,7 @@ begin
 --						WEB <= "0000" after 100 ps;
 						cache_sel <= '0' after 100 ps;
 						--if this was a write then get the cache to update
-						if rdmiss='1' then
+						if was_rdmiss='1' then
 							cache_write <= '0' after 100 ps;
 						end if;
 					end if;
@@ -356,6 +366,7 @@ begin
 					--Delay an extra cycle to make sure the new tags propagate to the other side of the cache
 					cache_state <= IDLE after 100 ps;
 					cache_write <= '0' after 100 ps;
+					dirty_clear <= '0' after 100 ps;
 					stall <= '0' after 100 ps;
 				end if;
 			end if;
